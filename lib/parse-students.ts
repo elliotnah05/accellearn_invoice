@@ -1,0 +1,150 @@
+import * as XLSX from "xlsx";
+import { recalcStudent, type ParseResult, type Student, type SubjectLine } from "@/types/student";
+
+// Column index map (0-based) matching "student details NEW.xlsx" (A–U).
+// One row per SUBJECT; rows sharing a Serial No are one child → one invoice.
+const COL = {
+  serialNo:        0,   // A
+  studentName:     1,   // B
+  parentName:      2,   // C
+  poc:             3,   // D
+  level:           4,   // E
+  subject:         5,   // F
+  durationHrs:     6,   // G
+  ratePerHour:     7,   // H
+  lessons:         8,   // I
+  materialFee:             9,   // J
+  materialAdjustment:      10,  // K
+  materialAdjustmentNotes: 11,  // L
+  lessonAdjustment:        12,  // M
+  lessonAdjustmentNotes:   13,  // N
+  invoiceIssued:   14,  // O
+  paid:            15,  // P
+  dateOfReceipt:   16,  // Q
+  receiptIssued:   17,  // R
+  differentEndDate:18,  // S
+  backedUp:        19,  // T
+  receiptSent:     20,  // U
+} as const;
+
+type Row = (string | number | boolean | null | undefined)[];
+
+function cellVal(row: Row, idx: number): string {
+  const v = row[idx];
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
+}
+
+function numVal(row: Row, idx: number): number {
+  const v = row[idx];
+  if (v === null || v === undefined || v === "") return 0;
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
+export function parseWorkbook(buffer: Buffer): ParseResult {
+  const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  const sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+
+  const raw = XLSX.utils.sheet_to_json<Row>(ws, {
+    header: 1,
+    defval: "",
+    blankrows: false,
+  });
+
+  const errors: string[] = [];
+  const students: Student[] = [];
+  const seenSerials = new Set<number>();
+
+  // Build the subject line for a data row.
+  function buildLine(row: Row, rowNum: number, name: string): SubjectLine {
+    const ratePerHour = numVal(row, COL.ratePerHour);
+    if (ratePerHour === 0) {
+      errors.push(`Row ${rowNum} (${name}): missing Per Hour Rate`);
+    }
+    return {
+      subject:      cellVal(row, COL.subject),
+      durationHrs:  numVal(row, COL.durationHrs) || 2,
+      ratePerHour,
+      lessons:      numVal(row, COL.lessons) || 12,
+      materialFee:             numVal(row, COL.materialFee),
+      materialAdjustment:      numVal(row, COL.materialAdjustment),
+      materialAdjustmentNotes: cellVal(row, COL.materialAdjustmentNotes),
+      lessonAdjustment:        numVal(row, COL.lessonAdjustment),
+      lessonAdjustmentNotes:   cellVal(row, COL.lessonAdjustmentNotes),
+      lessonFee: 0,
+      subtotal: 0,
+    };
+  }
+
+  // A row carries subject content if it has a subject name or any fee/rate data.
+  function hasSubjectData(row: Row): boolean {
+    return (
+      cellVal(row, COL.subject) !== "" ||
+      numVal(row, COL.ratePerHour) !== 0 ||
+      numVal(row, COL.materialFee) !== 0 ||
+      numVal(row, COL.lessons) !== 0
+    );
+  }
+
+  let current: Student | null = null; // the child rows are currently attaching to
+
+  // Row 0 = headers, data starts at row 1
+  for (let i = 1; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row || row.every((c) => c === "" || c === null || c === undefined)) continue;
+
+    const studentName = cellVal(row, COL.studentName);
+
+    // ── Continuation row (merged/blank Student Name) = another subject for the child above ──
+    if (!studentName) {
+      if (!hasSubjectData(row)) continue; // truly empty filler row
+      if (!current) {
+        errors.push(`Row ${i + 1}: subject data with no student name above it — skipped. Put the child's name on the first row.`);
+        continue;
+      }
+      current.subjects.push(buildLine(row, i + 1, current.studentName));
+      // Child-level fields (level, status) may sit only on the top row; fill any still-empty here.
+      if (!current.level) current.level = cellVal(row, COL.level);
+      for (const f of ["invoiceIssued", "paid", "dateOfReceipt", "receiptIssued", "differentEndDate", "backedUp", "receiptSent"] as const) {
+        if (!current[f]) current[f] = cellVal(row, COL[f]);
+      }
+      continue;
+    }
+
+    // ── New child ──
+    const serialNo = numVal(row, COL.serialNo);
+    if (serialNo > 0 && seenSerials.has(serialNo)) {
+      errors.push(
+        `Row ${i + 1} ("${studentName}"): serial ${serialNo} was already used above. ` +
+        `If this is the same child's extra subject, leave the Student Name cell blank (or merge it) instead of repeating the name.`
+      );
+    }
+    if (serialNo > 0) seenSerials.add(serialNo);
+
+    current = {
+      serialNo,
+      studentName,
+      parentName:      cellVal(row, COL.parentName),
+      poc:             cellVal(row, COL.poc),
+      level:           cellVal(row, COL.level),
+      subjects: [buildLine(row, i + 1, studentName)],
+      invoiceIssued:   cellVal(row, COL.invoiceIssued),
+      paid:            cellVal(row, COL.paid),
+      dateOfReceipt:   cellVal(row, COL.dateOfReceipt),
+      receiptIssued:   cellVal(row, COL.receiptIssued),
+      differentEndDate:cellVal(row, COL.differentEndDate),
+      backedUp:        cellVal(row, COL.backedUp),
+      receiptSent:     cellVal(row, COL.receiptSent),
+      totalFee: 0,
+    };
+    students.push(current);
+  }
+
+  return {
+    sheetName,
+    students: students.map(recalcStudent),
+    errors,
+  };
+}

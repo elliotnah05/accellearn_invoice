@@ -2,25 +2,62 @@
   "name": "app",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/prepare-standalone.js",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron": "node scripts/dev-electron.js",
+    "app:build": "next build",
+    "app:start": "node scripts/dev-electron.js",
+    "dist": "electron-builder"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
+    "@types/xlsx": "^0.0.35",
+    "exceljs": "^4.4.0",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "build": {
+    "appId": "sg.accellearn.invoices",
+    "productName": "AccelSuite Invoices",
+    "asar": true,
+    "files": [
+      "electron/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "standalone"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
   }
 }

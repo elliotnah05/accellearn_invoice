@@ -1,0 +1,54 @@
+{
+  "companyName": "The Accel Suite Pte. Ltd.",
+  "payNowUEN": "202033957D",
+  "clause1": "There are 4 terms in a year. Each term is 12 lessons. If the lesson falls on a public holiday, it will be postponed/change to consultation subjected to availability.",
+  "schedule": [
+    {
+      "label": "Term 1",
+      "period": "3/11/25 to 8/2/26",
+      "type": "term"
+    },
+    {
+      "label": "Break",
+      "period": "22/12/25 to 4/1/26",
+      "type": "break"
+    },
+    {
+      "label": "Term 2",
+      "period": "9/2/26 to 3/5/26",
+      "type": "term"
+    },
+    {
+      "label": "Term 3",
+      "period": "4/5/26 to 2/8/26",
+      "type": "term"
+    },
+    {
+      "label": "Break",
+      "period": "15/6/26 to 21/6/26",
+      "type": "break"
+    },
+    {
+      "label": "Term 4",
+      "period": "3/8/26 to 25/10/26",
+      "type": "term"
+    },
+    {
+      "label": "Break",
+      "period": "26/10/26 to 1/11/26",
+      "type": "break"
+    }
+  ],
+  "feeScheduleIntro": "The fees are as follows:",
+  "feeScheduleLines": [
+    "Material Cost: $30/Term",
+    "P3 and P4: $35/hour ($840 per term). Classes are 2 hours.",
+    "P5 and P6: $40/hour ($960 per term). Classes are 2 hours.",
+    "S1 and S2: $45/hour ($1080 per term). Classes are 2 hours.",
+    "S3 and S4: $50/hr ($1200 per term for 1 Subject, $1800 for 2 Subjects). Classes are 2 hours for 1 subject and 1.5 hours twice for 2 subjects.",
+    "JC1 and JC2: $85/hr ($2040 per term). Classes are 2 hours."
+  ],
+  "clause4": "In the event your child cannot attend, there will be no makeup lesson. However, case by case basis, we can arrange make up lesson with a class going through the exact same lesson.",
+  "outputFolder": "C:\\Users\\65981\\Documents\\AccelLearn Drive (LOCAL TEST)",
+  "spreadsheetPath": "C:\\Users\\65981\\Documents\\AccelLearn Drive (LOCAL TEST)\\student details NEW.xlsx"
+}
