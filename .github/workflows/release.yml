@@ -1,0 +1,70 @@
+# Builds the Windows installer and the Mac dmg whenever a version tag
+# (v0.2.0, v0.3.0, …) is pushed, and attaches both to one GitHub Release.
+#
+# To ship a release:
+#   git tag v0.x.y && git push origin v0.x.y
+# (keep package.json "version" in step with the tag)
+#
+# Stable download links (always the newest release):
+#   https://github.com/elliotnah05/accellearn_invoice/releases/latest/download/AccelLearn-Invoices-Setup.exe
+#   https://github.com/elliotnah05/accellearn_invoice/releases/latest/download/AccelLearn-Invoices.dmg
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: dist/AccelLearn-Invoices-Setup.exe
+          - os: macos-latest
+            artifact: dist/AccelLearn-Invoices.dmg
+    env:
+      # No code-signing certificates configured — build unsigned on both OSes.
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npx electron-builder --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: installers
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: installers/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
