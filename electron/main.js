@@ -5,7 +5,7 @@
 // ELECTRON_RUN_AS_NODE) and then load into a BrowserWindow. All the existing
 // API routes (PDF generation, Excel read/write) run inside that server.
 
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, shell, dialog, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const net = require("net");
@@ -108,13 +108,37 @@ async function startServer() {
   return port;
 }
 
-function createWindow(port) {
+// A lightweight branded "Starting…" screen shown instantly while the Next
+// server boots (a few seconds), so launch never looks frozen.
+const LOADING_HTML =
+  "data:text/html;charset=utf-8," +
+  encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><style>
+    html,body{height:100%;margin:0}
+    body{background:#AB33DA;color:#fff;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px}
+    .ring{width:46px;height:46px;border:4px solid rgba(255,255,255,.35);border-top-color:#fff;
+      border-radius:50%;animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    h1{font-size:22px;font-weight:700;letter-spacing:.5px;margin:0}
+    p{margin:0;color:#f0d7fb;font-size:13px}
+  </style></head><body>
+    <div class="ring"></div>
+    <h1>AccelSuite Invoices</h1>
+    <p>Starting up…</p>
+  </body></html>`);
+
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
     show: !SMOKE_TEST,
     title: "AccelSuite Invoices",
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    backgroundColor: "#AB33DA",
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "preload.js"),
+    },
   });
 
   // Open external links in the system browser, not inside the app window.
@@ -123,15 +147,24 @@ function createWindow(port) {
     return { action: "deny" };
   });
 
-  mainWindow.loadURL(`http://127.0.0.1:${port}/`);
+  mainWindow.loadURL(LOADING_HTML);
   mainWindow.on("closed", () => (mainWindow = null));
   return mainWindow;
 }
 
+// Open a local folder in the OS file manager (invoked from the web UI).
+ipcMain.handle("accel:open-path", async (_e, p) => {
+  if (typeof p !== "string" || !p.trim()) return { ok: false };
+  const err = await shell.openPath(p);
+  return { ok: !err, error: err || undefined };
+});
+
 app.whenReady().then(async () => {
+  // Show the window (with the loading screen) immediately.
+  const win = createWindow();
   try {
     const port = await startServer();
-    const win = createWindow(port);
+    win.loadURL(`http://127.0.0.1:${port}/`);
 
     if (SMOKE_TEST) {
       win.webContents.once("did-finish-load", () => {
@@ -154,7 +187,8 @@ app.whenReady().then(async () => {
     // macOS: recreate a window (reusing the running server) when the dock icon
     // is clicked and no windows are open.
     if (BrowserWindow.getAllWindows().length === 0 && serverPort) {
-      createWindow(serverPort);
+      const w = createWindow();
+      w.loadURL(`http://127.0.0.1:${serverPort}/`);
     }
   });
 });

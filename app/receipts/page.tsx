@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { subjectsText, type Student, type ParseResult } from "@/types/student";
 import type { LedgerEntry } from "@/lib/billing-store";
+import { isDesktop, openFolder } from "@/lib/desktop";
 
 function fmtCurrency(n: number) {
   return `$${n.toFixed(2)}`;
@@ -28,6 +29,7 @@ export default function ReceiptsPage() {
   const [sheetName, setSheetName] = useState("");
   const [entries, setEntries]     = useState<Record<number, LedgerEntry>>({});
   const [folderOk, setFolderOk]   = useState<boolean | null>(null);
+  const [outputFolder, setOutputFolder] = useState<string>("");
   const [busy, setBusy]           = useState<Set<number>>(new Set());
   const [bulkRunning, setBulkRunning] = useState(false);
   const [banner, setBanner]       = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
@@ -65,6 +67,7 @@ export default function ReceiptsPage() {
       const res = await fetch(`/api/receipts?term=${encodeURIComponent(term)}`);
       const body = await res.json();
       setFolderOk(!!body.folderConfigured);
+      if (body.outputFolder) setOutputFolder(body.outputFolder);
       const map: Record<number, LedgerEntry> = {};
       for (const e of body.entries as LedgerEntry[]) map[e.serialNo] = e;
       setEntries(map);
@@ -214,7 +217,17 @@ export default function ReceiptsPage() {
             banner.kind === "ok" ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-300 text-amber-800"
           }`}>
             <span>{banner.text}</span>
-            <button onClick={() => setBanner(null)} className="opacity-60 hover:opacity-100">✕</button>
+            <span className="flex items-center gap-3 flex-shrink-0">
+              {banner.kind === "ok" && outputFolder && isDesktop() && (
+                <button
+                  onClick={() => openFolder(outputFolder)}
+                  className="text-xs px-2 py-1 rounded border border-green-300 text-green-700 hover:bg-green-100 font-medium whitespace-nowrap"
+                >
+                  📂 Open folder
+                </button>
+              )}
+              <button onClick={() => setBanner(null)} className="opacity-60 hover:opacity-100">✕</button>
+            </span>
           </div>
         )}
 

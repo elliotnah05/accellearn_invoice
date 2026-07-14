@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Fragment } from "react";
 import Link from "next/link";
 import { subjectsText, totalLessons, type Student } from "@/types/student";
+import { isDesktop, openFolder } from "@/lib/desktop";
 
 type ApprovalStatus = "pending" | "approved" | "flagged";
 
@@ -30,6 +31,7 @@ export default function InvoicesPage() {
   const [preview, setPreview]     = useState<{ url: string; name: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [exportFolder, setExportFolder] = useState<string | null>(null);
   const urlCache = useRef<Record<number, string>>({});
 
   useEffect(() => {
@@ -138,6 +140,7 @@ export default function InvoicesPage() {
           `✓ ${body.written} invoice PDF(s) saved to the shared folder` +
           (body.failed?.length ? ` — ${body.failed.length} failed` : "")
         );
+        setExportFolder(body.folder ?? null);
         // Carry data forward for the receipts phase
         sessionStorage.setItem("accel_approved", JSON.stringify(approved));
         sessionStorage.setItem("accel_sheet", sheetName);
@@ -352,8 +355,18 @@ export default function InvoicesPage() {
             <strong className="text-gray-400">{pendingCount}</strong> pending
           </span>
           {exportMsg ? (
-            <span className={exportMsg.startsWith("✓") ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
-              {exportMsg}
+            <span className="flex items-center gap-3">
+              <span className={exportMsg.startsWith("✓") ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
+                {exportMsg}
+              </span>
+              {exportMsg.startsWith("✓") && exportFolder && isDesktop() && (
+                <button
+                  onClick={() => openFolder(exportFolder)}
+                  className="text-xs px-2 py-1 rounded border border-green-300 text-green-700 hover:bg-green-50 font-medium"
+                >
+                  📂 Open folder
+                </button>
+              )}
             </span>
           ) : approvedCount > 0 && (
             <span className="text-green-600 font-medium">

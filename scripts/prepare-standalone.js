@@ -21,3 +21,30 @@ fs.rmSync(dest, { recursive: true, force: true });
 fs.cpSync(src, dest, { recursive: true });
 
 console.log(`prepare-standalone: copied .next/static -> ${path.relative(appRoot, dest)}`);
+
+// Defensive: if Next ever traces the electron-builder output into the bundle,
+// strip it so it can't recursively balloon the packaged app (dist→standalone→dist).
+const stray = path.join(appRoot, ".next", "standalone", "dist");
+if (fs.existsSync(stray)) {
+  fs.rmSync(stray, { recursive: true, force: true });
+  console.warn("prepare-standalone: removed stray .next/standalone/dist");
+}
+
+// Next's standalone tracer sometimes omits compiled next-server *runtime* files
+// (seen: app-route-turbo.runtime.prod.js missing → every API route 500s in the
+// packaged app, which has no full node_modules to fall back to). Copy every
+// production runtime file from the full next install into the bundle so all
+// route types resolve.
+const nsRel = path.join("node_modules", "next", "dist", "compiled", "next-server");
+const nsSrc = path.join(appRoot, nsRel);
+const nsDest = path.join(appRoot, ".next", "standalone", nsRel);
+if (fs.existsSync(nsSrc)) {
+  fs.mkdirSync(nsDest, { recursive: true });
+  let copied = 0;
+  for (const f of fs.readdirSync(nsSrc)) {
+    if (!f.endsWith(".runtime.prod.js")) continue; // prod runtimes only, no maps/dev
+    const to = path.join(nsDest, f);
+    if (!fs.existsSync(to)) { fs.copyFileSync(path.join(nsSrc, f), to); copied++; }
+  }
+  console.log(`prepare-standalone: ensured ${copied} next-server runtime file(s)`);
+}

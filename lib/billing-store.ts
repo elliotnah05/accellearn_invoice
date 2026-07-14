@@ -47,11 +47,30 @@ export function writeLedger(ledger: Ledger): void {
 
 // ── Output folder ─────────────────────────────────────────────────────────────
 
+/** Sanitise a term into a safe single folder segment. Keeps it human-readable
+ *  ("AY 26 T3") but strips path separators, drive/colon, and dot-segments so a
+ *  crafted sheet name can never escape the output folder (path traversal). */
+export function safeTermFolder(term: string): string {
+  const cleaned = (term ?? "")
+    .replace(/[/\\:]+/g, " ")      // kill path separators + drive colons
+    .replace(/\.\.+/g, "")          // kill dot-dot sequences
+    .replace(/[<>:"|?*\x00-\x1f]/g, "") // illegal Windows filename chars
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "TERM";
+}
+
 /** Returns the absolute directory (created if needed), or null if not configured. */
 export function ensureOutputDir(config: TemplateConfig, sub: string, term: string): string | null {
   const base = config.outputFolder?.trim();
   if (!base) return null;
-  const dir = path.join(base, sub, term);
+  // sub is a hardcoded caller constant; term is sanitised to prevent traversal.
+  const dir = path.join(base, sub, safeTermFolder(term));
+  // Defence-in-depth: the resolved dir must stay inside base.
+  const rel = path.relative(path.resolve(base), path.resolve(dir));
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    throw new Error("Invalid output path");
+  }
   mkdirSync(dir, { recursive: true });
   return dir;
 }

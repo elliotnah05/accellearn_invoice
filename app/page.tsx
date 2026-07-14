@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Mode = "invoices" | "receipts";
 
@@ -27,9 +27,55 @@ const WORKFLOWS: Record<Mode, { heading: string; blurb: string; steps: Step[] }>
   },
 };
 
+type SyncState =
+  | { status: "loading" }
+  | { status: "ok"; folder: string; count: number; syncedAt: string }
+  | { status: "error"; message: string; folder: string };
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export default function Home() {
   const [mode, setMode] = useState<Mode>("invoices");
   const wf = WORKFLOWS[mode];
+
+  const [sync, setSync] = useState<SyncState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfgRes = await fetch("/api/config");
+        const cfg = cfgRes.ok ? await cfgRes.json() : {};
+        const folder: string = cfg.spreadsheetPath || cfg.outputFolder || "(not set)";
+        const res = await fetch("/api/students");
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          if (!cancelled) setSync({ status: "error", message: body.error || "Could not read the master spreadsheet.", folder });
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) {
+          setSync({
+            status: "ok",
+            folder,
+            count: Array.isArray(data.students) ? data.students.length : 0,
+            syncedAt: data.fileModified || "",
+          });
+        }
+      } catch {
+        if (!cancelled) setSync({ status: "error", message: "Could not reach the app server.", folder: "(unknown)" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -70,6 +116,37 @@ export default function Home() {
             );
           })}
         </div>
+      </div>
+
+      {/* Data-source status banner */}
+      <div className="px-8 pt-5 max-w-3xl mx-auto w-full">
+        {sync.status === "loading" && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+            Checking your spreadsheet…
+          </div>
+        )}
+        {sync.status === "ok" && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm flex items-start gap-2">
+            <span className="text-green-600">●</span>
+            <div className="text-gray-700">
+              <span className="font-medium text-green-800">Connected</span> — reading{" "}
+              <span className="font-semibold">{sync.count}</span> students from{" "}
+              <code className="text-xs bg-white px-1 py-0.5 rounded border border-green-200 break-all">{sync.folder}</code>
+              {sync.syncedAt && <span className="text-gray-500"> · last updated {formatTime(sync.syncedAt)}</span>}
+            </div>
+          </div>
+        )}
+        {sync.status === "error" && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm">
+            <p className="font-semibold text-amber-800">⚠ Can’t read your master spreadsheet</p>
+            <p className="text-amber-700 mt-0.5">{sync.message}</p>
+            <p className="text-amber-700 mt-1">
+              Looking at <code className="text-xs bg-white px-1 py-0.5 rounded border border-amber-200 break-all">{sync.folder}</code>.
+              Make sure Google Drive is synced, then check{" "}
+              <Link href="/settings" className="underline font-medium">Settings → Folders</Link>.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 px-8 py-10 max-w-3xl mx-auto w-full">

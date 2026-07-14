@@ -28,6 +28,10 @@ export async function GET() {
   }
 
   try {
+    const MAX_BYTES = 10 * 1024 * 1024; // 10 MB — a student sheet is far smaller
+    if (statSync(file).size > MAX_BYTES) {
+      return Response.json({ error: "Master spreadsheet is unexpectedly large (over 10 MB) — refusing to parse." }, { status: 413 });
+    }
     const result = parseWorkbook(readFileSync(file));
     return Response.json({
       ...result,
