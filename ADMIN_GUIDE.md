@@ -1,6 +1,6 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
-**App name:** AccelLearn Invoices (Windows desktop app)
+**App name:** AccelLearn Invoices (Windows & Mac desktop app)
 **Last updated:** 14 July 2026
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
 
@@ -28,8 +28,10 @@ Download from google.com/drive/download, sign in, and make sure the shared folde
 Recommended: right-click the folder → *Offline access* → *Available offline*, so the app still works if the internet drops.
 
 **Step 3 — Install the app.**
-Run **`AccelLearn Invoices Setup 0.1.0.exe`** (kept in the shared Drive folder / provided by the owner).
-Windows will show a blue **"Windows protected your PC"** SmartScreen warning because the installer is unsigned — this is expected. Click **More info → Run anyway**.
+Both installers are in the shared Drive folder under **`App Installer`** (with a READ ME file walking through these same steps):
+
+- **Windows:** run **`AccelLearn-Invoices-Setup.exe`**. Windows shows a blue **"Windows protected your PC"** warning because the installer is unsigned — this is expected. Click **More info → Run anyway**, then Next → Install → Finish.
+- **Mac:** open **`AccelLearn-Invoices.dmg`** and drag the app into Applications. The first launch is blocked ("Apple could not verify…") because the app isn't registered with Apple — go to **System Settings → Privacy & Security → Open Anyway** (older Macs: right-click the app → Open → Open). Needed once only.
 
 **Step 4 — Point the app at the folder (one-time, per computer).**
 Open the app → **Settings → Folders** and set:
@@ -37,7 +39,7 @@ Open the app → **Settings → Folders** and set:
 - **Output folder:** the shared Drive folder, e.g. `G:\My Drive\accellearn-invoice-reciept`
 - **Spreadsheet path:** the master file inside it, e.g. `G:\My Drive\accellearn-invoice-reciept\student details NEW.xlsx`
 
-Use **your** computer's drive letter. This setting is stored per computer, so every new machine needs this step once.
+Use **your** computer's drive letter (on a Mac the folder lives under `~/Library/CloudStorage/GoogleDrive-<your email>/My Drive/…` — easiest is to find it in Finder and copy the location). This setting is stored per computer, so every new machine needs this step once.
 
 **Step 5 — Check it works.**
 The home page should show a green **"Connected — N students from …"** banner. If it shows an amber error instead, see Troubleshooting (section 7).
@@ -164,7 +166,7 @@ When an admin changes, the owner does this:
 
 **Off-boarding the old admin**
 1. Remove their Google account from the Drive folder's sharing list.
-2. Ask them to uninstall the app (Windows Settings → Apps → AccelLearn Invoices) and confirm no copies of the spreadsheet/PDFs remain on their machine (check their Drive for desktop is signed out or the offline copy removed).
+2. Ask them to uninstall the app (Windows: Settings → Apps → AccelLearn Invoices; Mac: drag the app from Applications to Trash) and confirm no copies of the spreadsheet/PDFs remain on their machine (check their Drive for desktop is signed out or the offline copy removed).
 
 **On-boarding the new admin**
 1. Share the Drive folder `accellearn-invoice-reciept` with their Google account (Editor).
@@ -180,6 +182,7 @@ When an admin changes, the owner does this:
 |---|---|
 | Amber banner: "Master spreadsheet not found — check Settings → Folders" | Google Drive for desktop isn't running yet (start it, wait for sync, reopen the app), or the drive letter / path in Settings → Folders is wrong for this computer. |
 | Blue "Windows protected your PC" when installing | Expected (unsigned installer). More info → Run anyway. |
+| Mac blocks the app: "Apple could not verify…" | Expected (app not registered with Apple). System Settings → Privacy & Security → **Open Anyway** (older Macs: right-click the app → Open). Once only. |
 | Warning: "Spreadsheet is open in Excel…" when generating a receipt | The receipt PDF was still created. Close the file in Excel and re-generate (it overwrites safely), or type the receipt number into column R yourself. |
 | A child shows up twice / "serial already used" warning | The child's name was repeated on their second subject row. Blank/merge the name cell on the extra rows (Section 4). |
 | Child not appearing as ready for receipt | Column P (Paid) is empty, or contains "no"/"n". |
@@ -194,7 +197,11 @@ When an admin changes, the owner does this:
 
 Admins can ignore this section.
 
-- **Installer:** `AccelLearn Invoices Setup 0.1.0.exe` (~156 MB, NSIS, unsigned). Built from the source repo with `npm run build` then `npm run dist` inside `app/`.
+- **Installers:** built automatically by GitHub Actions whenever a version tag is pushed (`git tag v0.x.y && git push origin v0.x.y`) — a Windows machine and a Mac machine build `AccelLearn-Invoices-Setup.exe` (NSIS) and `AccelLearn-Invoices.dmg` (universal Intel + Apple Silicon), both unsigned, and attach them to one GitHub Release (~10–15 min). Keep package.json `version` in step with the tag.
+- **Stable download links** (always the newest release):
+  `https://github.com/elliotnah05/accellearn_invoice/releases/latest/download/AccelLearn-Invoices-Setup.exe`
+  `https://github.com/elliotnah05/accellearn_invoice/releases/latest/download/AccelLearn-Invoices.dmg`
+  Every past version stays archived under Releases, so you can roll back by downloading an older one. Local one-off builds still work: `npm run build` then `npm run dist` inside `app/`.
 - **Source code:** the `INVOICE ACCELLEARN` project folder (repo `accellearn_invoice`, scoped to `app/`). Next.js 16 + Electron.
 - **Per-machine app config** (folder paths, invoice template): `%APPDATA%\app\data\template.json` — but always prefer editing via the in-app Settings pages.
 - **Receipt ledger** (issue/re-issue/sent history, serial numbers only — no names, by PDPA design): stored alongside the config in the same data folder.
