@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -71,6 +71,7 @@
       ],
       "icon": "build/icon.png",
       "identity": null,
+      "x64ArchFiles": "**/*.node",
       "category": "public.app-category.business",
       "artifactName": "AccelLearn-Invoices.${ext}"
     }
