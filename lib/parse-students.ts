@@ -42,6 +42,19 @@ function numVal(row: Row, idx: number): number {
   return isNaN(n) ? 0 : n;
 }
 
+/** Excel silently converts typed dates ("13/7/26") into date cells, which reach
+ *  us as day serials (e.g. 46216) — and those would print verbatim on receipts.
+ *  For the free-text status columns, turn plausible serials (2020–2064) back
+ *  into dd/mm/yy text. Anything else falls through unchanged. */
+function dateVal(row: Row, idx: number): string {
+  const v = row[idx];
+  if (typeof v === "number" && v >= 43831 && v < 60000) {
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86400000);
+    return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCFullYear()).slice(2)}`;
+  }
+  return cellVal(row, idx);
+}
+
 export function parseWorkbook(buffer: Buffer): ParseResult {
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
   const sheetName = wb.SheetNames[0];
@@ -108,7 +121,7 @@ export function parseWorkbook(buffer: Buffer): ParseResult {
       // Child-level fields (level, status) may sit only on the top row; fill any still-empty here.
       if (!current.level) current.level = cellVal(row, COL.level);
       for (const f of ["invoiceIssued", "paid", "dateOfReceipt", "receiptIssued", "differentEndDate", "backedUp", "receiptSent"] as const) {
-        if (!current[f]) current[f] = cellVal(row, COL[f]);
+        if (!current[f]) current[f] = dateVal(row, COL[f]);
       }
       continue;
     }
@@ -130,13 +143,13 @@ export function parseWorkbook(buffer: Buffer): ParseResult {
       poc:             cellVal(row, COL.poc),
       level:           cellVal(row, COL.level),
       subjects: [buildLine(row, i + 1, studentName)],
-      invoiceIssued:   cellVal(row, COL.invoiceIssued),
-      paid:            cellVal(row, COL.paid),
-      dateOfReceipt:   cellVal(row, COL.dateOfReceipt),
-      receiptIssued:   cellVal(row, COL.receiptIssued),
-      differentEndDate:cellVal(row, COL.differentEndDate),
-      backedUp:        cellVal(row, COL.backedUp),
-      receiptSent:     cellVal(row, COL.receiptSent),
+      invoiceIssued:   dateVal(row, COL.invoiceIssued),
+      paid:            dateVal(row, COL.paid),
+      dateOfReceipt:   dateVal(row, COL.dateOfReceipt),
+      receiptIssued:   dateVal(row, COL.receiptIssued),
+      differentEndDate:dateVal(row, COL.differentEndDate),
+      backedUp:        dateVal(row, COL.backedUp),
+      receiptSent:     dateVal(row, COL.receiptSent),
       totalFee: 0,
     };
     students.push(current);
