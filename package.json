@@ -37,7 +37,7 @@
   },
   "build": {
     "appId": "sg.accellearn.invoices",
-    "productName": "AccelSuite Invoices",
+    "productName": "AccelLearn Invoices",
     "asar": true,
     "files": [
       "electron/**",

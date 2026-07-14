@@ -221,7 +221,7 @@ export default function ReceiptsPage() {
               {banner.kind === "ok" && outputFolder && isDesktop() && (
                 <button
                   onClick={() => openFolder(outputFolder)}
-                  className="text-xs px-2 py-1 rounded border border-green-300 text-green-700 hover:bg-green-100 font-medium whitespace-nowrap"
+                  className="px-4 py-2 text-sm rounded-lg border border-green-300 text-green-700 hover:bg-green-100 font-medium whitespace-nowrap flex-shrink-0"
                 >
                   📂 Open folder
                 </button>

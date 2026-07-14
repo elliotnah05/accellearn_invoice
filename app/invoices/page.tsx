@@ -347,8 +347,8 @@ export default function InvoicesPage() {
       </main>
 
       {/* ── Sticky bottom action bar ── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg px-8 py-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-6 text-sm text-gray-600">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg px-8 py-4 flex items-center justify-between gap-6 z-10">
+        <div className="flex items-center gap-6 text-sm text-gray-600 min-w-0">
           <span>
             <strong className="text-green-600">{approvedCount}</strong> approved ·{" "}
             <strong className="text-yellow-600">{flaggedCount}</strong> flagged ·{" "}
@@ -362,7 +362,7 @@ export default function InvoicesPage() {
               {exportMsg.startsWith("✓") && exportFolder && isDesktop() && (
                 <button
                   onClick={() => openFolder(exportFolder)}
-                  className="text-xs px-2 py-1 rounded border border-green-300 text-green-700 hover:bg-green-50 font-medium"
+                  className="px-4 py-2 text-sm rounded-lg border border-green-300 text-green-700 hover:bg-green-50 font-medium whitespace-nowrap flex-shrink-0"
                 >
                   📂 Open folder
                 </button>

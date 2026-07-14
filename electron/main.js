@@ -1,4 +1,4 @@
-// Electron main process for the AccelSuite invoice app.
+// Electron main process for the AccelLearn invoice app.
 //
 // In production the UI is the same Next.js app, served by its own standalone
 // server which we spawn as a child process (using Electron's bundled Node via
@@ -123,7 +123,7 @@ const LOADING_HTML =
     p{margin:0;color:#f0d7fb;font-size:13px}
   </style></head><body>
     <div class="ring"></div>
-    <h1>AccelSuite Invoices</h1>
+    <h1>AccelLearn Invoices</h1>
     <p>Starting up…</p>
   </body></html>`);
 
@@ -132,7 +132,7 @@ function createWindow() {
     width: 1280,
     height: 860,
     show: !SMOKE_TEST,
-    title: "AccelSuite Invoices",
+    title: "AccelLearn Invoices",
     backgroundColor: "#AB33DA",
     webPreferences: {
       contextIsolation: true,
