@@ -16,6 +16,37 @@ function fmtCurrency(n: number) {
 const inputCls =
   "w-full bg-transparent border-b border-transparent focus:border-purple-400 focus:outline-none text-center py-0.5 focus:bg-white rounded transition-colors";
 
+// Preview table columns — width/min drive the draggable colgroup below, so
+// admins can pull columns wider/narrower to see long notes (like Excel).
+const COLUMNS = [
+  { key: "no",             width: 40,  min: 32  },
+  { key: "student",        width: 140, min: 90  },
+  { key: "parent",         width: 120, min: 80  },
+  { key: "poc",            width: 110, min: 80  },
+  { key: "level",          width: 90,  min: 60  },
+  { key: "subject",        width: 110, min: 70  },
+  { key: "rate",           width: 70,  min: 50  },
+  { key: "duration",       width: 70,  min: 50  },
+  { key: "lessons",        width: 70,  min: 50  },
+  { key: "material",       width: 80,  min: 60  },
+  { key: "matAdj",         width: 90,  min: 60  },
+  { key: "matAdjNotes",    width: 160, min: 90  },
+  { key: "lessonAdj",      width: 90,  min: 60  },
+  { key: "lessonAdjNotes", width: 160, min: 90  },
+  { key: "subtotal",       width: 90,  min: 60  },
+  { key: "childTotal",     width: 100, min: 70  },
+] as const;
+
+function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-white/30 active:bg-white/50"
+    />
+  );
+}
+
 export default function ImportPage() {
   const [dragging, setDragging]         = useState(false);
   const [loading, setLoading]           = useState(false);
@@ -28,6 +59,44 @@ export default function ImportPage() {
   const [masterAvailable, setMasterAvailable] = useState(false);
   const [loadedFrom, setLoadedFrom]     = useState<"upload" | "master" | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Draggable column widths (Excel-style column resize) ──
+  const [colWidths, setColWidths] = useState<number[]>(() => COLUMNS.map((c) => c.width));
+  const resizing = useRef<{ idx: number; startX: number; startWidth: number } | null>(null);
+
+  const onResizeMove = useCallback((e: MouseEvent) => {
+    const r = resizing.current;
+    if (!r) return;
+    const min = COLUMNS[r.idx].min;
+    const next = Math.max(min, r.startWidth + (e.clientX - r.startX));
+    setColWidths((prev) => {
+      if (prev[r.idx] === next) return prev;
+      const copy = [...prev];
+      copy[r.idx] = next;
+      return copy;
+    });
+  }, []);
+
+  const onResizeUp = useCallback(() => {
+    resizing.current = null;
+    document.body.style.cursor = "";
+    document.removeEventListener("mousemove", onResizeMove);
+    document.removeEventListener("mouseup", onResizeUp);
+  }, [onResizeMove]);
+
+  const startResize = useCallback((idx: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = { idx, startX: e.clientX, startWidth: colWidths[idx] };
+    document.body.style.cursor = "col-resize";
+    document.addEventListener("mousemove", onResizeMove);
+    document.addEventListener("mouseup", onResizeUp);
+  }, [colWidths, onResizeMove, onResizeUp]);
+
+  // Safety net: drop any listeners left attached if the component unmounts mid-drag.
+  useEffect(() => () => {
+    document.removeEventListener("mousemove", onResizeMove);
+    document.removeEventListener("mouseup", onResizeUp);
+  }, [onResizeMove, onResizeUp]);
 
   // Master sheet configured? (enables the one-click load button)
   useEffect(() => {
@@ -236,33 +305,70 @@ export default function ImportPage() {
             <p className="text-xs text-gray-400 -mb-2">
               ✏️ Click any purple-highlighted cell to edit — totals recalculate automatically. A child with multiple
               subjects has the extra subjects on the rows below with the Student Name cell left blank (or merged) — they
-              become a single invoice.
+              become a single invoice. Drag a column's right edge to resize it, like in Excel.
             </p>
 
             {/* Preview / edit table */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="text-sm" style={{ tableLayout: "fixed", width: colWidths.reduce((a, b) => a + b, 0) }}>
+                  <colgroup>
+                    {COLUMNS.map((c, i) => (
+                      <col key={c.key} style={{ width: colWidths[i] }} />
+                    ))}
+                  </colgroup>
                   <thead>
                     <tr style={{ backgroundColor: "#AB33DA" }} className="text-white text-xs uppercase tracking-wide">
-                      <th className="px-3 py-3 text-left font-semibold">#</th>
-                      <th className="px-3 py-3 text-left font-semibold">Student</th>
-                      <th className="px-3 py-3 text-left font-semibold">Parent</th>
-                      <th className="px-3 py-3 text-left font-semibold">POC</th>
-                      <th className="px-3 py-3 text-center font-semibold">Level</th>
-                      <th className="px-3 py-3 text-center font-semibold">Subject</th>
+                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                        #<ResizeHandle onMouseDown={(e) => startResize(0, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                        Student<ResizeHandle onMouseDown={(e) => startResize(1, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                        Parent<ResizeHandle onMouseDown={(e) => startResize(2, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                        POC<ResizeHandle onMouseDown={(e) => startResize(3, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
+                        Level<ResizeHandle onMouseDown={(e) => startResize(4, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
+                        Subject<ResizeHandle onMouseDown={(e) => startResize(5, e)} />
+                      </th>
                       {/* Editable columns — slightly tinted header */}
-                      <th className="px-2 py-3 text-center font-semibold bg-purple-700">Rate/hr</th>
-                      <th className="px-2 py-3 text-center font-semibold bg-purple-700">Dur (hr)</th>
-                      <th className="px-2 py-3 text-center font-semibold bg-purple-700">Lessons</th>
-                      <th className="px-2 py-3 text-center font-semibold bg-purple-700">Material</th>
-                      <th className="px-2 py-3 text-center font-semibold bg-purple-700">Mat. Adj ($)</th>
-                      <th className="px-3 py-3 text-left font-semibold bg-purple-700">Mat. Adj Notes</th>
-                      <th className="px-2 py-3 text-center font-semibold bg-purple-700">Lesson Adj ($)</th>
-                      <th className="px-3 py-3 text-left font-semibold bg-purple-700">Lesson Adj Notes</th>
+                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
+                        Rate/hr<ResizeHandle onMouseDown={(e) => startResize(6, e)} />
+                      </th>
+                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
+                        Dur (hr)<ResizeHandle onMouseDown={(e) => startResize(7, e)} />
+                      </th>
+                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
+                        Lessons<ResizeHandle onMouseDown={(e) => startResize(8, e)} />
+                      </th>
+                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
+                        Material<ResizeHandle onMouseDown={(e) => startResize(9, e)} />
+                      </th>
+                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
+                        Mat. Adj ($)<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-left font-semibold bg-purple-700">
+                        Mat. Adj Notes<ResizeHandle onMouseDown={(e) => startResize(11, e)} />
+                      </th>
+                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
+                        Lesson Adj ($)<ResizeHandle onMouseDown={(e) => startResize(12, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-left font-semibold bg-purple-700">
+                        Lesson Adj Notes<ResizeHandle onMouseDown={(e) => startResize(13, e)} />
+                      </th>
                       {/* Calculated */}
-                      <th className="px-3 py-3 text-right font-semibold">Subtotal</th>
-                      <th className="px-3 py-3 text-right font-semibold">Child Total</th>
+                      <th className="relative select-none px-3 py-3 text-right font-semibold">
+                        Subtotal<ResizeHandle onMouseDown={(e) => startResize(14, e)} />
+                      </th>
+                      <th className="relative select-none px-3 py-3 text-right font-semibold">
+                        Child Total<ResizeHandle onMouseDown={(e) => startResize(15, e)} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -277,12 +383,12 @@ export default function ImportPage() {
                             edited ? "bg-yellow-50" : childIdx % 2 === 1 ? "bg-gray-50" : "bg-white"
                           } hover:bg-purple-50`}
                         >
-                          <td className="px-3 py-2 text-gray-400 text-xs">{isFirst ? child.serialNo : ""}</td>
-                          <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">
+                          <td className="px-3 py-2 text-gray-400 text-xs overflow-hidden text-ellipsis">{isFirst ? child.serialNo : ""}</td>
+                          <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.studentName : undefined}>
                             {isFirst ? child.studentName : <span className="text-gray-300 text-xs pl-2">↳ same child</span>}
                           </td>
-                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{isFirst ? child.parentName : ""}</td>
-                          <td className="px-3 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{isFirst ? maskPoc(child.poc) : ""}</td>
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.parentName : undefined}>{isFirst ? child.parentName : ""}</td>
+                          <td className="px-3 py-2 text-gray-500 font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">{isFirst ? maskPoc(child.poc) : ""}</td>
                           <td className="px-3 py-2 text-center">
                             {isFirst && (
                               <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: "#EDE9F7", color: "#7B2FBE" }}>
