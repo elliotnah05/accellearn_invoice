@@ -1,8 +1,15 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App name:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 14 July 2026
+**Last updated:** 21 July 2026
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
+
+---
+
+## 📌 Recent changes you should know about (v0.2.3)
+
+- **Lesson Adjustment (column M) no longer prints on the invoice.** It used to show as its own line item next to the lesson fee; now it stays in the spreadsheet purely for **your own reference**. The dollar amount is still silently added into the Grand Total exactly as before — what the parent is actually charged hasn't changed, only the printed breakdown. Material Adjustment (columns K/L) is unaffected and still prints as usual, with its note.
+- **The Import Sheet review table now has resizable columns.** Drag the right edge of any column header left or right to widen or narrow it — handy for reading a long adjustment note in full without opening the spreadsheet. Works just like resizing a column in Excel. Widths are just for your current viewing session and reset next time you load the sheet.
 
 ---
 
@@ -52,7 +59,7 @@ The home page should show a green **"Connected — N students from …"** banner
 
 ### Invoices
 
-1. **Import Sheet** — click *Load Master Sheet* to pull the live spreadsheet (you can also drag-drop an Excel file, but normally you never need to). The table is editable: rate, duration, lessons, fees, adjustments. Edited rows turn yellow and totals recalculate live. *Edits here only affect the PDFs being generated — they are NOT written back to the spreadsheet.*
+1. **Import Sheet** — click *Load Master Sheet* to pull the live spreadsheet (you can also drag-drop an Excel file, but normally you never need to). The table is editable: rate, duration, lessons, fees, adjustments. Edited rows turn yellow and totals recalculate live. *Edits here only affect the PDFs being generated — they are NOT written back to the spreadsheet.* Drag a column header's right edge to widen/narrow it if you need to read a long note in full.
 2. **Generate Invoices** — creates a PDF per child. A child with multiple subjects gets **one** invoice with a line item per subject.
 3. **Review & Approve** — each row has *Preview* (opens the PDF in a pop-up so you can check it before it goes anywhere), then Approve ✓ or Flag ⚠ (a flagged row expands so you can type a note about what's wrong). *Approve All Pending* for bulk. The bar at the bottom keeps a live count of approved / flagged / pending and the total dollar amount.
 4. **Export** — approved invoices are written to the shared folder under **`Invoices\<term>\`** (e.g. `Invoices\AY 26 T3\`). Use the *Open folder* button, then send each PDF to the parent yourself.
@@ -188,7 +195,7 @@ When an admin changes, the owner does this:
 | Child not appearing as ready for receipt | Column P (Paid) is empty, or contains "no"/"n". |
 | App shows outdated numbers | The pages read live on load; use the ⟳ Refresh button on the Receipts page, or reload the page. Also check Drive has finished syncing (tick icon). |
 | Duplicate receipt warning | You already issued this receipt. Proceeding re-issues with the **same** number and overwrites the same PDF — safe if you meant to re-issue. |
-| Invoice PDF missing an adjustment | Adjustment notes print even when the amount is $0 — check the note is in column L or N of the right row. |
+| Invoice PDF missing a Material Adjustment | Material Adjustment notes print even when the amount is $0 — check the note is in column L of the right row. (Lesson Adjustment, column M/N, never prints — that's expected, see "Recent changes" above.) |
 | A date shows as a number like `46216` in the app or on a receipt | You're running an outdated version of the app — install the current installer from the Drive folder. Current versions read Excel dates correctly. |
 
 ---
