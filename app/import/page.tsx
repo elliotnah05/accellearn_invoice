@@ -347,7 +347,7 @@ export default function ImportPage() {
                               type="number" value={line.lessonAdjustment} step={1}
                               onChange={(e) => updateLine(childIdx, subjIdx, { lessonAdjustment: Number(e.target.value) })}
                               className={inputCls + " w-16 " + (line.lessonAdjustment < 0 ? "text-red-500" : line.lessonAdjustment > 0 ? "text-green-600" : "")}
-                              title="Lesson adjustment amount (duration change, make-up, missed lesson)"
+                              title="Lesson adjustment amount (duration change, make-up, missed lesson) — counted in the Grand Total but not printed on the invoice"
                             />
                           </td>
                           <td className="px-2 py-1 bg-purple-50">
@@ -356,7 +356,7 @@ export default function ImportPage() {
                               onChange={(e) => updateLine(childIdx, subjIdx, { lessonAdjustmentNotes: e.target.value })}
                               placeholder="e.g. 2hr → 1.5hr from Wk 5…"
                               className="w-full bg-transparent border-b border-transparent focus:border-purple-400 focus:outline-none py-0.5 text-xs text-left text-gray-600 placeholder-gray-300"
-                              title="Lesson adjustment notes — printed on the invoice"
+                              title="Lesson adjustment notes — for admin reference only, not printed on the invoice"
                             />
                           </td>
 

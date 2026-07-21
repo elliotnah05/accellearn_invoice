@@ -105,8 +105,8 @@ This is the most important section. The spreadsheet is the **single source of tr
 | J | Material Fee ($) | `30` | Number only; leave blank or `0` if none |
 | K | Material Adjustment ($) | `-10` | Use a **minus for discounts**; can be `0` with a note — the note still prints |
 | L | Material Adj Notes | `sibling discount` | Prints on the invoice next to the material line |
-| M | Lesson Adjustment ($) | `-55` | e.g. lesson missed last term, discount; minus = reduce |
-| N | Lesson Adj Notes | `1 make-up lesson carried over` | Prints on the invoice next to the lesson line |
+| M | Lesson Adjustment ($) | `-55` | e.g. lesson missed last term, discount; minus = reduce. **Not printed on the invoice** — still counted in the total, but for your own reference only |
+| N | Lesson Adj Notes | `1 make-up lesson carried over` | **Not printed on the invoice** — internal note only |
 | O | Invoice Issued | `1/7/26` (or `yes`) | Admin fills manually — your own tracking |
 | P | Paid | `yes`, `PayNow`, or `13/7/26` | Anything except no/n — see "Paid rule" below |
 | Q | Date of Receipt | `13/7/26` | **Date the payment arrived — this exact date prints on the receipt** ("received a payment … on 13/07/26") |
