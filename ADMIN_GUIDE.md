@@ -33,8 +33,17 @@ The flow in one line:
 The owner must share the Google Drive folder **`accellearn-invoice-reciept`** with your Google account. This folder contains the master spreadsheet, all generated PDFs, and this guide.
 
 **Step 2 — Install Google Drive for desktop.**
-Download from google.com/drive/download, sign in, and make sure the shared folder appears in File Explorer (usually under a drive letter like `G:\My Drive\accellearn-invoice-reciept` — **the letter can differ per computer**, note down yours).
-Recommended: right-click the folder → *Offline access* → *Available offline*, so the app still works if the internet drops.
+Download from google.com/drive/download and sign in. This is what makes the Drive folder appear as a **normal folder on your computer** — the app reads the spreadsheet as a file, so the folder must be visible in File Explorer (Windows) or Finder (Mac). Using Google Drive in a web browser is **not** enough.
+
+⚠️ **The one step almost everyone misses.** If the folder was *shared with you* (rather than owned by you), it lands in **"Shared with me"**, which Drive for desktop does **not** put on your computer. You will not see it in File Explorer and the app will keep saying it can't find the spreadsheet.
+
+**Fix it once:** open Google Drive in a browser → **Shared with me** → right-click `accellearn-invoice-reciept` → **Organise → Add shortcut to Drive** (older wording: *Add shortcut to My Drive*) → choose **My Drive** → Add. Within a minute it appears on your computer and stays there.
+*If you are the owner of the folder, skip this — it is already in My Drive.*
+
+**Then confirm where it landed:** typically `G:\My Drive\accellearn-invoice-reciept` on Windows — **the drive letter differs per computer** (G:, H:, …), so check yours. On Mac it's under `~/Library/CloudStorage/GoogleDrive-<your email>/My Drive/…`.
+Fastest way to get the exact path: open the folder, then on Windows click the address bar and copy it; on Mac right-click the folder → *Get Info* → copy the location. Paste that straight into Settings in Step 4.
+
+**Recommended:** right-click the folder → **Offline access → Available offline**. By default Drive only *streams* files (they live in the cloud until opened), which makes the app slow to read the spreadsheet and unable to work if the internet drops. Making it available offline keeps a real copy on the machine and syncs changes in the background.
 
 **Step 3 — Install the app.**
 Both installers are in the shared Drive folder under **`App Installer`** (with a READ ME file walking through these same steps):
@@ -197,8 +206,8 @@ When an admin changes, the owner does this:
 
 **On-boarding the new admin**
 1. Share the Drive folder `accellearn-invoice-reciept` with their Google account (Editor).
-2. Send them this guide and the installer.
-3. They follow **Section 2** (setup) on their computer.
+2. Send them a **link**, not files — the installers are large (155 MB Windows, 271 MB Mac) and both already sit in the Drive folder under `App Installer`, alongside this guide. Once they have Drive access there is nothing to send at all. (Chat apps also tend to flag or block `.exe` attachments.)
+3. They follow **Section 2** (setup) on their computer — flag Step 2's "Shared with me" shortcut, which is where most people get stuck.
 4. Walk them through one full cycle: generate one invoice → export → generate one receipt → Mark as Sent, and show them the merged-cell rule in the spreadsheet (Section 4).
 
 ---
@@ -208,6 +217,9 @@ When an admin changes, the owner does this:
 | Problem | Cause & fix |
 |---|---|
 | Amber banner: "Master spreadsheet not found — check Settings → Folders" | Google Drive for desktop isn't running yet (start it, wait for sync, reopen the app), or the drive letter / path in Settings → Folders is wrong for this computer. |
+| The Drive folder is nowhere in File Explorer / Finder | It's sitting in **"Shared with me"**, which doesn't sync to your computer. Add a shortcut to My Drive — see Section 2, Step 2. This is the most common setup problem. |
+| Settings → Folders is empty on a new install | Normal. Every computer picks its own folders — fill both in from Section 2, Step 4. |
+| Folder paths look right but point at someone else's computer | You're on an old version that shipped the builder's paths. Clear both boxes in Settings → Folders and enter your own. |
 | Blue "Windows protected your PC" when installing | Expected (unsigned installer). More info → Run anyway. |
 | Mac blocks the app: "Apple could not verify…" | Expected (app not registered with Apple). System Settings → Privacy & Security → **Open Anyway** (older Macs: right-click the app → Open). Once only. |
 | Warning: "Spreadsheet is open in Excel…" when generating a receipt | The receipt PDF was still created. Close the file in Excel and re-generate (it overwrites safely), or type the receipt number into column R yourself. |
