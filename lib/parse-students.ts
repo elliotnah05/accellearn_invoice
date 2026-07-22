@@ -1,8 +1,11 @@
 import * as XLSX from "xlsx";
 import { recalcStudent, type ParseResult, type Student, type SubjectLine } from "@/types/student";
 
-// Column index map (0-based) matching "student details NEW.xlsx" (A–U).
+// Column index map (0-based) matching "student details LATEST.xlsx" (A–S).
 // One row per SUBJECT; rows sharing a Serial No are one child → one invoice.
+// A–H are fixed forever (the template guarantees it); everything from I on is
+// the current billing layout. The old sheets had separate Material/Lesson
+// adjustment pairs in K–N, which pushed the status columns out to O–U.
 const COL = {
   serialNo:        0,   // A
   studentName:     1,   // B
@@ -13,18 +16,16 @@ const COL = {
   durationHrs:     6,   // G
   ratePerHour:     7,   // H
   lessons:         8,   // I
-  materialFee:             9,   // J
-  materialAdjustment:      10,  // K
-  materialAdjustmentNotes: 11,  // L
-  lessonAdjustment:        12,  // M
-  lessonAdjustmentNotes:   13,  // N
-  invoiceIssued:   14,  // O
-  paid:            15,  // P
-  dateOfReceipt:   16,  // Q
-  receiptIssued:   17,  // R
-  differentEndDate:18,  // S
-  backedUp:        19,  // T
-  receiptSent:     20,  // U
+  materialFee:     9,   // J
+  adjustment:      10,  // K  — one figure, may be negative
+  adjustmentNotes: 11,  // L  — internal only, never printed
+  invoiceIssued:   12,  // M
+  paid:            13,  // N
+  dateOfReceipt:   14,  // O
+  receiptIssued:   15,  // P
+  differentEndDate:16,  // Q
+  backedUp:        17,  // R
+  receiptSent:     18,  // S
 } as const;
 
 type Row = (string | number | boolean | null | undefined)[];
@@ -81,11 +82,9 @@ export function parseWorkbook(buffer: Buffer): ParseResult {
       durationHrs:  numVal(row, COL.durationHrs) || 2,
       ratePerHour,
       lessons:      numVal(row, COL.lessons) || 12,
-      materialFee:             numVal(row, COL.materialFee),
-      materialAdjustment:      numVal(row, COL.materialAdjustment),
-      materialAdjustmentNotes: cellVal(row, COL.materialAdjustmentNotes),
-      lessonAdjustment:        numVal(row, COL.lessonAdjustment),
-      lessonAdjustmentNotes:   cellVal(row, COL.lessonAdjustmentNotes),
+      materialFee:     numVal(row, COL.materialFee),
+      adjustment:      numVal(row, COL.adjustment),
+      adjustmentNotes: cellVal(row, COL.adjustmentNotes),
       lessonFee: 0,
       subtotal: 0,
     };

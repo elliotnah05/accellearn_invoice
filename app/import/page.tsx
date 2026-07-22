@@ -29,10 +29,8 @@ const COLUMNS = [
   { key: "duration",       width: 70,  min: 50  },
   { key: "lessons",        width: 70,  min: 50  },
   { key: "material",       width: 80,  min: 60  },
-  { key: "matAdj",         width: 90,  min: 60  },
-  { key: "matAdjNotes",    width: 160, min: 90  },
-  { key: "lessonAdj",      width: 90,  min: 60  },
-  { key: "lessonAdjNotes", width: 160, min: 90  },
+  { key: "adjustment",     width: 90,  min: 60  },
+  { key: "adjustmentNotes", width: 200, min: 90  },
   { key: "subtotal",       width: 90,  min: 60  },
   { key: "childTotal",     width: 100, min: 70  },
 ] as const;
@@ -351,23 +349,17 @@ export default function ImportPage() {
                         Material<ResizeHandle onMouseDown={(e) => startResize(9, e)} />
                       </th>
                       <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
-                        Mat. Adj ($)<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
+                        Adjustment ($)<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
                       </th>
                       <th className="relative select-none px-3 py-3 text-left font-semibold bg-purple-700">
-                        Mat. Adj Notes<ResizeHandle onMouseDown={(e) => startResize(11, e)} />
-                      </th>
-                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
-                        Lesson Adj ($)<ResizeHandle onMouseDown={(e) => startResize(12, e)} />
-                      </th>
-                      <th className="relative select-none px-3 py-3 text-left font-semibold bg-purple-700">
-                        Lesson Adj Notes<ResizeHandle onMouseDown={(e) => startResize(13, e)} />
+                        Adj Notes<ResizeHandle onMouseDown={(e) => startResize(11, e)} />
                       </th>
                       {/* Calculated */}
                       <th className="relative select-none px-3 py-3 text-right font-semibold">
-                        Subtotal<ResizeHandle onMouseDown={(e) => startResize(14, e)} />
+                        Subtotal<ResizeHandle onMouseDown={(e) => startResize(12, e)} />
                       </th>
                       <th className="relative select-none px-3 py-3 text-right font-semibold">
-                        Child Total<ResizeHandle onMouseDown={(e) => startResize(15, e)} />
+                        Child Total<ResizeHandle onMouseDown={(e) => startResize(13, e)} />
                       </th>
                     </tr>
                   </thead>
@@ -433,36 +425,19 @@ export default function ImportPage() {
                           </td>
                           <td className="px-2 py-1 bg-purple-50">
                             <input
-                              type="number" value={line.materialAdjustment} step={1}
-                              onChange={(e) => updateLine(childIdx, subjIdx, { materialAdjustment: Number(e.target.value) })}
-                              className={inputCls + " w-16 " + (line.materialAdjustment < 0 ? "text-red-500" : line.materialAdjustment > 0 ? "text-green-600" : "")}
-                              title="Material adjustment amount (extra items bought)"
+                              type="number" value={line.adjustment} step={1}
+                              onChange={(e) => updateLine(childIdx, subjIdx, { adjustment: Number(e.target.value) })}
+                              className={inputCls + " w-16 " + (line.adjustment < 0 ? "text-red-500" : line.adjustment > 0 ? "text-green-600" : "")}
+                              title="Adjustment amount — type a minus sign to discount (e.g. -80 for missed lessons), or a plain number to add (e.g. 90 for an extra session). Printed on the invoice as a single Adjustment line."
                             />
                           </td>
                           <td className="px-2 py-1 bg-purple-50">
                             <input
-                              type="text" value={line.materialAdjustmentNotes}
-                              onChange={(e) => updateLine(childIdx, subjIdx, { materialAdjustmentNotes: e.target.value })}
-                              placeholder="e.g. assessment book…"
-                              className="w-full bg-transparent border-b border-transparent focus:border-purple-400 focus:outline-none py-0.5 text-xs text-left text-gray-600 placeholder-gray-300"
-                              title="Material adjustment notes — printed on the invoice"
-                            />
-                          </td>
-                          <td className="px-2 py-1 bg-purple-50">
-                            <input
-                              type="number" value={line.lessonAdjustment} step={1}
-                              onChange={(e) => updateLine(childIdx, subjIdx, { lessonAdjustment: Number(e.target.value) })}
-                              className={inputCls + " w-16 " + (line.lessonAdjustment < 0 ? "text-red-500" : line.lessonAdjustment > 0 ? "text-green-600" : "")}
-                              title="Lesson adjustment amount (duration change, make-up, missed lesson) — counted in the Grand Total but not printed on the invoice"
-                            />
-                          </td>
-                          <td className="px-2 py-1 bg-purple-50">
-                            <input
-                              type="text" value={line.lessonAdjustmentNotes}
-                              onChange={(e) => updateLine(childIdx, subjIdx, { lessonAdjustmentNotes: e.target.value })}
+                              type="text" value={line.adjustmentNotes}
+                              onChange={(e) => updateLine(childIdx, subjIdx, { adjustmentNotes: e.target.value })}
                               placeholder="e.g. 2hr → 1.5hr from Wk 5…"
                               className="w-full bg-transparent border-b border-transparent focus:border-purple-400 focus:outline-none py-0.5 text-xs text-left text-gray-600 placeholder-gray-300"
-                              title="Lesson adjustment notes — for admin reference only, not printed on the invoice"
+                              title="Your own reference only — never printed on the invoice or receipt."
                             />
                           </td>
 

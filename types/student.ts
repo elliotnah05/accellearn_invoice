@@ -6,13 +6,14 @@ export interface SubjectLine {
   ratePerHour: number;
   lessons: number;
   materialFee: number;
-  materialAdjustment: number;
-  materialAdjustmentNotes: string;
-  lessonAdjustment: number;
-  lessonAdjustmentNotes: string;
+  /** One combined adjustment (was separate material + lesson adjustments).
+   *  Positive adds to the bill, negative discounts it. */
+  adjustment: number;
+  /** Admin's internal reason for the adjustment — never printed on the invoice. */
+  adjustmentNotes: string;
   // Calculated
   lessonFee: number;   // ratePerHour * durationHrs * lessons
-  subtotal: number;    // lessonFee + lessonAdjustment + materialFee + materialAdjustment
+  subtotal: number;    // lessonFee + materialFee + adjustment
 }
 
 /** A child = one invoice = one receipt. Grouped from Excel rows sharing a Serial No. */
@@ -43,7 +44,7 @@ export interface ParseResult {
 
 export function recalcLine(l: SubjectLine): SubjectLine {
   const lessonFee = l.ratePerHour * l.durationHrs * l.lessons;
-  const subtotal  = lessonFee + l.lessonAdjustment + l.materialFee + l.materialAdjustment;
+  const subtotal  = lessonFee + l.materialFee + l.adjustment;
   return { ...l, lessonFee, subtotal };
 }
 

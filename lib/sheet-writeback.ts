@@ -7,8 +7,8 @@ import type { TemplateConfig } from "@/app/api/config/route";
 // (EBUSY) or not configured, we return a warning string instead of failing
 // the receipt generation.
 
-const COL_RECEIPT_ISSUED = 18; // R
-const COL_RECEIPT_SENT   = 21; // U
+const COL_RECEIPT_ISSUED = 16; // P
+const COL_RECEIPT_SENT   = 19; // S
 
 export interface WritebackResult {
   ok: boolean;
@@ -43,19 +43,22 @@ async function withSheet(
 }
 
 function findRowBySerial(ws: ExcelJS.Worksheet, serialNo: number): ExcelJS.Row | null {
-  for (let r = 2; r <= ws.actualRowCount; r++) {
+  // rowCount = last used row number. actualRowCount (the count of non-empty
+  // rows) would stop the scan short the moment anyone leaves a blank row in the
+  // middle of the sheet, silently skipping every student below it.
+  for (let r = 2; r <= ws.rowCount; r++) {
     const v = ws.getRow(r).getCell(1).value;
     if (Number(v) === serialNo) return ws.getRow(r);
   }
   return null;
 }
 
-function styleCell(cell: ExcelJS.Cell, rowNumber: number): void {
+function styleCell(cell: ExcelJS.Cell): void {
   cell.font = { name: "Calibri", size: 10 };
   cell.alignment = { horizontal: "center", vertical: "middle" };
-  cell.fill = rowNumber % 2 === 0
-    ? { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } }
-    : { type: "pattern", pattern: "none" };
+  // Deliberately does NOT set the fill. The sheet is banded per CHILD (a
+  // multi-subject child's rows share one colour), so guessing a fill from row
+  // parity here would punch a mismatched cell into the middle of a band.
 }
 
 function dmy(d = new Date()): string {
@@ -70,7 +73,7 @@ export function writebackReceiptIssued(
     if (!row) throw new Error(`Serial ${serialNo} not found in sheet`);
     const cell = row.getCell(COL_RECEIPT_ISSUED);
     cell.value = `${receiptNo} · ${dmy()}`;
-    styleCell(cell, row.number);
+    styleCell(cell);
   });
 }
 
@@ -82,6 +85,6 @@ export function writebackReceiptSent(
     if (!row) throw new Error(`Serial ${serialNo} not found in sheet`);
     const cell = row.getCell(COL_RECEIPT_SENT);
     cell.value = `Sent ${dmy()}`;
-    styleCell(cell, row.number);
+    styleCell(cell);
   });
 }

@@ -1,16 +1,20 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App name:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 22 July 2026
+**Last updated:** 22 July 2026 (v0.3.0 — new column layout)
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
 
 ---
 
-## 📌 Recent changes you should know about (v0.2.4)
+## 📌 Recent changes you should know about (v0.3.0)
 
-- **Receipt history now lives in the spreadsheet, not on one computer.** The app decides whether a receipt already exists by reading column **R** of the master file in the shared Drive folder. Previously it also relied on a record kept on the machine that issued it, which meant a *different* computer — a new admin, or the owner after handover — could re-issue a receipt without any warning. Now every computer sees the same history automatically, with nothing to copy across or set up. **What this means for you:** never clear columns R or U by hand (see Receipts, step 5).
-- **Column P ("Paid") — read the warning in section 4.** Writing `pending`, `TBC`, or `partial` in that column makes the app treat the child as **fully paid**. Leave the cell completely empty until the money is actually in.
-- **Lesson Adjustment (column M) no longer prints on the invoice.** It used to show as its own line item next to the lesson fee; now it stays in the spreadsheet purely for **your own reference**. The dollar amount is still silently added into the Grand Total exactly as before — what the parent is actually charged hasn't changed, only the printed breakdown. Material Adjustment (columns K/L) is unaffected and still prints as usual, with its note.
+- **⚠️ There is now ONE master file: `student details LATEST.xlsx`.** Every other copy has been retired. If you have an older `student details NEW.xlsx` anywhere, do not use it — its columns are in the old order and the app will read the wrong values out of it.
+- **The two adjustment columns are now a single "Adjustment".** Material Adjustment and Lesson Adjustment (which used to be columns K–N) are merged into **column K — Adjustment ($)** plus **column L — Adjustment Notes**. Type a **minus** to reduce the bill (`-80`) or a plain number to add to it (`90`). Your totals have not changed: every student's Grand Total is exactly what it was before the merge.
+- **Adjustment Notes are never printed.** Column L is your internal record only — it does not appear on the invoice or the receipt. The **amount** in column K does print, as a single "Adjustment" line under that subject.
+- **Everything after column L shifted two letters left.** Because two columns disappeared, the status columns moved: Invoice Issued is now **M**, Paid is **N**, Date of Receipt **O**, Receipt Issued **P**, Different End Date **Q**, Backed Up **R**, Receipt Sent **S**. The sheet ends at **S** instead of U. See the full table in section 4.
+- **New: `student details TEMPLATE.xlsx`.** A blank, correctly-formatted copy sitting next to the master. Start each new term from it instead of copying and pasting between sheets — see section 4a.
+- **Receipt history now lives in the spreadsheet, not on one computer.** The app decides whether a receipt already exists by reading column **P** of the master file in the shared Drive folder. Previously it also relied on a record kept on the machine that issued it, which meant a *different* computer — a new admin, or the owner after handover — could re-issue a receipt without any warning. Now every computer sees the same history automatically, with nothing to copy across or set up. **What this means for you:** never clear columns P or S by hand (see Receipts, step 5).
+- **Column N ("Paid") — read the warning in section 4.** Writing `pending`, `TBC`, or `partial` in that column makes the app treat the child as **fully paid**. Leave the cell completely empty until the money is actually in. (This column used to be P.)
 - **The Import Sheet review table now has resizable columns.** Drag the right edge of any column header left or right to widen or narrow it — handy for reading a long adjustment note in full without opening the spreadsheet. Works just like resizing a column in Excel. Widths are just for your current viewing session and reset next time you load the sheet.
 
 ---
@@ -55,7 +59,7 @@ Both installers are in the shared Drive folder under **`App Installer`** (with a
 Open the app → **Settings → Folders** and set:
 
 - **Output folder:** the shared Drive folder, e.g. `G:\My Drive\accellearn-invoice-reciept`
-- **Spreadsheet path:** the master file inside it, e.g. `G:\My Drive\accellearn-invoice-reciept\student details NEW.xlsx`
+- **Spreadsheet path:** the master file inside it, e.g. `G:\My Drive\accellearn-invoice-reciept\student details LATEST.xlsx`
 
 Use **your** computer's drive letter (on a Mac the folder lives under `~/Library/CloudStorage/GoogleDrive-<your email>/My Drive/…` — easiest is to find it in Finder and copy the location). This setting is stored per computer, so every new machine needs this step once.
 
@@ -78,11 +82,11 @@ The home page should show a green **"Connected — N students from …"** banner
 ### Receipts
 
 1. A child appears as **ready for a receipt** once their **Paid** column in the spreadsheet is filled in (see section 4).
-2. **Generate** writes the PDF to **`Receipts\<term>\`** and automatically writes back into the spreadsheet: column **R** (Receipt Issued) gets the receipt number and date.
-3. **Mark as Sent** after you've sent it to the parent — ✅ **this DOES edit the master spreadsheet for you**, writing column **U** (Receipt Sent), e.g. `Sent 19/07/26`. (Generating the receipt in step 2 likewise writes column R.) You don't have to fill these in by hand — unless the spreadsheet was open in Excel at the time, in which case the app can't write and warns you.
+2. **Generate** writes the PDF to **`Receipts\<term>\`** and automatically writes back into the spreadsheet: column **P** (Receipt Issued) gets the receipt number and date.
+3. **Mark as Sent** after you've sent it to the parent — ✅ **this DOES edit the master spreadsheet for you**, writing column **S** (Receipt Sent), e.g. `Sent 19/07/26`. (Generating the receipt in step 2 likewise writes column P.) You don't have to fill these in by hand — unless the spreadsheet was open in Excel at the time, in which case the app can't write and warns you.
 4. Receipt numbers are automatic and fixed: `R-AY26T3-013` = term AY 26 T3, serial 13. **Re-generating the same receipt can never create a second conflicting number** — the app warns you it's a duplicate and, if you proceed, overwrites the same file.
 5. **The spreadsheet is what remembers.** The app knows a receipt already exists because column **R** is filled in — not because of anything stored on your computer. That means the duplicate warning works **on any computer, for any admin**: a brand-new install reads the same shared spreadsheet and immediately knows the full history. Nothing is lost when an admin changes machines or hands over.
-   ⚠️ The flip side: **do not clear or overwrite columns R and U by hand.** Wiping them tells the app the receipt never happened, and it will silently issue a second one. If a receipt genuinely needs re-doing, use the *Re-generate* button — it keeps the same number and replaces the same file.
+   ⚠️ The flip side: **do not clear or overwrite columns P and S by hand.** Wiping them tells the app the receipt never happened, and it will silently issue a second one. If a receipt genuinely needs re-doing, use the *Re-generate* button — it keeps the same number and replaces the same file.
 
 ### Status
 
@@ -107,7 +111,7 @@ Remember to click **Save Changes** when done — a green "✓ Changes have been 
 
 This is the most important section. The spreadsheet is the **single source of truth** — the app reads it live and writes receipt status back into it.
 
-**The file:** `student details NEW.xlsx` in the shared Drive folder. The **sheet (tab) name is the term** — e.g. `AY 26 T3` — and it becomes the PDF folder name, so name it sensibly.
+**The file:** `student details LATEST.xlsx` in the shared Drive folder. This is the **only** master — if you find an older `student details LATEST.xlsx` anywhere, it is retired and must not be used. The **sheet (tab) name is the term** — e.g. `AY 26 T3` — and it becomes the PDF folder name, so name it sensibly.
 
 ### Column layout (do not rename, reorder, insert, or delete columns)
 
@@ -123,25 +127,47 @@ This is the most important section. The spreadsheet is the **single source of tr
 | H | Rate/hr ($) | `55` | Number only, no $ sign. **Required** — the app flags rows missing this |
 | I | Lessons | `12` | Number of lessons in the term (blank = 12) |
 | J | Material Fee ($) | `30` | Number only; leave blank or `0` if none |
-| K | Material Adjustment ($) | `-10` | Use a **minus for discounts**; can be `0` with a note — the note still prints |
-| L | Material Adj Notes | `sibling discount` | Prints on the invoice next to the material line |
-| M | Lesson Adjustment ($) | `-55` | e.g. lesson missed last term, discount; minus = reduce. **Not printed on the invoice** — still counted in the total, but for your own reference only |
-| N | Lesson Adj Notes | `1 make-up lesson carried over` | **Not printed on the invoice** — internal note only |
-| O | Invoice Issued | `1/7/26` (or `yes`) | Admin fills manually — your own tracking |
-| P | Paid | `yes`, `PayNow`, or `13/7/26` | Anything except no/n — see "Paid rule" below |
-| Q | Date of Receipt | `13/7/26` | **Date the payment arrived — this exact date prints on the receipt** ("received a payment … on 13/07/26") |
-| R | Receipt Issued | *leave alone* | **App writes this**: `R-AY26T3-015 · 14/07/26` |
-| S | Different End Date | `2/8/26` (usually empty) | Only if a child ends the term early/late — **prints as that child's term end date on the receipt** |
-| T | Backed Up | `yes` / `✓` | Admin's own tracking, not used by the app |
-| U | Receipt Sent | *leave alone* | **App writes this** when you click Mark as Sent: `Sent 14/07/26` |
+| K | Adjustment ($) | `-80` or `90` | **One figure, plus or minus.** Minus reduces the bill (missed lessons, discount, shorter lessons); a plain number adds to it (extra session, assessment book). Prints on the invoice as a single "Adjustment" line for that subject. Leave blank or `0` if none |
+| L | Adjustment Notes | `2 lessons missed, not replaced` | **Your own reference only — never printed on the invoice or receipt.** Write whatever helps you remember why column K is what it is |
+| M | Invoice Issued | `1/7/26` (or `yes`) | Admin fills manually — your own tracking |
+| N | Paid | `yes`, `PayNow`, or `13/7/26` | Anything except no/n — see "Paid rule" below |
+| O | Date of Receipt | `13/7/26` | **Date the payment arrived — this exact date prints on the receipt** ("received a payment … on 13/07/26") |
+| P | Receipt Issued | *leave alone* | **App writes this**: `R-AY26T3-015 · 14/07/26` |
+| Q | Different End Date | `2/8/26` (usually empty) | Only if a child ends the term early/late — **prints as that child's term end date on the receipt** |
+| R | Backed Up | `yes` / `✓` | Admin's own tracking, not used by the app |
+| S | Receipt Sent | *leave alone* | **App writes this** when you click Mark as Sent: `Sent 14/07/26` |
 
-Lesson fee is calculated as **Rate × Duration × Lessons**; the child's total = lesson fees + material fees + all adjustments.
+### How a bill is worked out
+
+For **each subject row**:
+
+```
+Lesson Fee = Rate/hr (H) × Duration (G) × Lessons (I)
+Subtotal   = Lesson Fee + Material Fee (J) + Adjustment (K)
+```
+
+Then:
+
+```
+Grand Total = the subtotals of all of the child's subject rows added together
+```
+
+The Adjustment is added, so a **negative** number subtracts. Worked example — a child taking two subjects:
+
+| | Maths | Science |
+|---|---|---|
+| Rate × Duration × Lessons | $40 × 2 × 12 = **$960** | $40 × 1.5 × 12 = **$720** |
+| Material Fee (J) | $30 | $25 |
+| Adjustment (K) | **+$45** (assessment book) | **−$75** (2hr → 1.5hr from Wk 5) |
+| **Subtotal** | **$1,035** | **$670** |
+
+**Grand Total = $1,035 + $670 = $1,705.** The invoice shows six lines (Lesson Fee, Material Fee and Adjustment for each subject); the two notes in column L appear nowhere on it. A negative adjustment prints in brackets, accounting-style: `($75.00)`.
 
 ### Dates — how to type them
 
 - Just type dates naturally, e.g. **`13/7/26`**, and press Enter — Excel converts it into a proper date cell and the app reads it correctly, showing it as `13/07/26`. Typing it as plain text also works.
 - Keep to **day/month/year** order (Singapore style). Avoid ambiguous or American formats like `7/13/26`.
-- The two dates parents actually see are **Q (Date of Receipt)** and **S (Different End Date)** — both print word-for-word on the receipt, so double-check those two.
+- The two dates parents actually see are **O (Date of Receipt)** and **Q (Different End Date)** — both print word-for-word on the receipt, so double-check those two.
 - If a date ever shows up as a plain number like `46216` in the app or on a PDF, you're running an outdated version of the app — install the current installer from the Drive folder.
 
 ### Children with more than one subject — the merged-cell rule
@@ -149,40 +175,55 @@ Lesson fee is calculated as **Rate × Duration × Lessons**; the child's total =
 One row = one subject. A child taking two subjects takes **two rows**, grouped like this:
 
 - Put the child's details (columns A–E) on the **first** row only.
-- **Merge** columns A–E and O–U vertically across the child's rows (select the cells → Merge & Center). At minimum, leave Student Name (B) **blank** on the extra rows — a blank/merged name cell is how the app knows "this row is another subject for the child above".
-- Each row keeps its own subject columns F–N.
+- **Merge** columns A–E and M–S vertically across the child's rows (select the cells → Merge & Center). At minimum, leave Student Name (B) **blank** on the extra rows — a blank/merged name cell is how the app knows "this row is another subject for the child above".
+- Each row keeps its own subject columns F–L.
 
 ⚠️ **Never repeat the child's name on the second row.** The app will treat it as a duplicate child, warn about the reused serial, and could produce two invoices. Blank or merged = same child; name filled in = new child.
 
-### The "Paid" rule (column P)
+### The "Paid" rule (column N)
 
-The app does **not** understand what you write in column P. It applies one blunt rule:
+The app does **not** understand what you write in column N. It applies one blunt rule:
 
 > **Empty, or `no` / `n` / `false` / `0`** → not paid.
 > **Literally anything else** → paid, and the child becomes ready for a receipt.
 
 So `yes`, `Y`, `PayNow`, `13/7/26`, `bank transfer` all correctly mean paid.
 
-⚠️ **The trap: words that mean "not paid yet" still count as PAID.** If you type **`pending`**, **`TBC`**, **`partial`**, **`half`**, **`chasing`**, **`waiting`**, or a reminder note like `asked mum 12/7` into column P, the app reads all of those as **paid** and will happily offer to issue a receipt for money you have not received. It is not being clever — it only checks whether the cell is empty.
+⚠️ **The trap: words that mean "not paid yet" still count as PAID.** If you type **`pending`**, **`TBC`**, **`partial`**, **`half`**, **`chasing`**, **`waiting`**, or a reminder note like `asked mum 12/7` into column N, the app reads all of those as **paid** and will happily offer to issue a receipt for money you have not received. It is not being clever — it only checks whether the cell is empty.
 
-**The safe habit:** column P has exactly two states.
+**The safe habit:** column N has exactly two states.
 
 - Money **not** in → leave the cell **completely empty**. Nothing else.
 - Money **in** → type `yes` (or the payment date).
 
-If you need to record chasing notes, part payments, or "parent says they'll pay Friday", put them in **any other column or a comment** — never in column P. A part payment is **not** paid: leave P empty until the full amount arrives, or you will issue a receipt for the full term fee against a partial payment.
+If you need to record chasing notes, part payments, or "parent says they'll pay Friday", put them in **any other column or a comment** — never in column N. A part payment is **not** paid: leave P empty until the full amount arrives, or you will issue a receipt for the full term fee against a partial payment.
 
 *(Why it works this way: different admins write "paid" a dozen different ways, so the app accepts all of them rather than forcing one spelling. The cost of that flexibility is that it can't tell a real payment from a note.)*
 
 ### Other rules
 
-- **Close the spreadsheet before generating receipts.** If the file is open in Excel, the receipt PDF still generates but the app can't write columns R/U — it will warn you, and you must fill in the cell by hand (or close Excel and re-generate).
+- **Close the spreadsheet before generating receipts.** If the file is open in Excel, the receipt PDF still generates but the app can't write columns P/S — it will warn you, and you must fill in the cell by hand (or close Excel and re-generate).
 - **Header row stays on row 1.** Data starts from row 2.
 - **Make a backup copy before big edits** (e.g. setting up a new term). Just copy the file in Drive and add the date to the name.
-- **New term = new file or new tab** named after the term (e.g. `AY 26 T4`), same column layout. Then update Settings → Folders if the file name changed, and update the term schedule in Settings.
+- **New term = new file or new tab** named after the term (e.g. `AY 26 T4`), same column layout. Start it from the template — see section 4a. Then update Settings → Folders if the file name changed, and update the term schedule in Settings.
 - The file must stay under **10 MB** (it will be nowhere near this in normal use).
 
 ---
+
+## 4a. Starting a new term — use the template file
+
+Sitting next to the master is **`student details TEMPLATE.xlsx`**: an empty sheet with the correct headers, colours, column widths and frozen header row, and **nothing else**. It exists so that setting up a term never involves copying and pasting blocks of cells between spreadsheets — which is how columns end up shifted by one and every invoice comes out wrong.
+
+**To start a new term:**
+
+1. In Drive, right-click `student details TEMPLATE.xlsx` → **Make a copy**. Rename the copy to the new term, e.g. `student details LATEST AY 26 T4.xlsx` — or add a new tab to the existing master and paste the template's header row into it.
+2. Rename the **tab** to the term (e.g. `AY 26 T4`). The template ships with its tab called `NEW TERM (rename this tab)` precisely so a forgotten rename is impossible to miss — the tab name becomes the PDF folder name.
+3. Fill in **columns A–H** for each child — Serial No, Student Name, Parent Name, POC, Level, Subject, Duration, Rate. **These eight columns never change between terms**, so you can safely copy them down from last term's sheet in one block.
+4. Fill in **I (Lessons)**, **J (Material Fee)** and, where needed, **K/L (Adjustment and its note)** for the new term.
+5. Leave **M–S** (the status columns) completely empty. The app fills P and S in for you; M, N, O, Q and R are yours to fill as the term runs.
+6. Point the app at the new file: **Settings → Folders → Spreadsheet path**.
+
+⚠️ **Never insert, delete or reorder a column**, in the template or the master. The app finds every field by its column position, not by its heading — a single inserted column silently shifts everything after it and the app will read material fees as lesson counts. If a column heading looks wrong, retype the heading; don't move the column.
 
 ## 5. Data protection (PDPA) — non-negotiable
 
@@ -205,7 +246,7 @@ When an admin changes, the owner does this:
 2. Ask them to uninstall the app (Windows: Settings → Apps → AccelLearn Invoices; Mac: drag the app from Applications to Trash) and confirm no copies of the spreadsheet/PDFs remain on their machine (check their Drive for desktop is signed out or the offline copy removed).
 
 **Before handing over a spreadsheet that was used for testing**
-Clear columns **R** (Receipt Issued) and **U** (Receipt Sent) of any practice entries first. The app treats those columns as the real record, so leftover test values make children look like they already have receipts — and trigger a false "already exists" warning when the genuine one is issued. Leave column P (Paid) alone if you want the new admin to be able to try generating a receipt straight away.
+Clear columns **P** (Receipt Issued) and **S** (Receipt Sent) of any practice entries first. The app treats those columns as the real record, so leftover test values make children look like they already have receipts — and trigger a false "already exists" warning when the genuine one is issued. Leave column N (Paid) alone if you want the new admin to be able to try generating a receipt straight away.
 
 **On-boarding the new admin**
 1. Share the Drive folder `accellearn-invoice-reciept` with their Google account (Editor).
@@ -225,15 +266,15 @@ Clear columns **R** (Receipt Issued) and **U** (Receipt Sent) of any practice en
 | Folder paths look right but point at someone else's computer | You're on an old version that shipped the builder's paths. Clear both boxes in Settings → Folders and enter your own. |
 | Blue "Windows protected your PC" when installing | Expected (unsigned installer). More info → Run anyway. |
 | Mac blocks the app: "Apple could not verify…" | Expected (app not registered with Apple). System Settings → Privacy & Security → **Open Anyway** (older Macs: right-click the app → Open). Once only. |
-| Warning: "Spreadsheet is open in Excel…" when generating a receipt | The receipt PDF was still created. Close the file in Excel and re-generate (it overwrites safely), or type the receipt number into column R yourself. |
+| Warning: "Spreadsheet is open in Excel…" when generating a receipt | The receipt PDF was still created. Close the file in Excel and re-generate (it overwrites safely), or type the receipt number into column P yourself. |
 | A child shows up twice / "serial already used" warning | The child's name was repeated on their second subject row. Blank/merge the name cell on the extra rows (Section 4). |
-| Child not appearing as ready for receipt | Column P (Paid) is empty, or contains "no"/"n". |
-| A child shows as "ready for receipt" but hasn't actually paid | Column P contains a note like `pending`, `TBC`, `partial` or `chasing` — the app counts **any** text as paid. Clear the cell completely (section 4, "Paid rule"). |
+| Child not appearing as ready for receipt | Column N (Paid) is empty, or contains "no"/"n". |
+| A child shows as "ready for receipt" but hasn't actually paid | Column N contains a note like `pending`, `TBC`, `partial` or `chasing` — the app counts **any** text as paid. Clear the cell completely (section 4, "Paid rule"). |
 | Child shows "Generated"/"Sent" but you never issued it on this computer | Correct and expected — another admin issued it and the spreadsheet remembers. Nothing to fix. |
 | No duplicate warning when you expected one | Column R was cleared or overwritten by hand. That column is how the app remembers — restore it, or use *Re-generate* rather than deleting. |
 | App shows outdated numbers | The pages read live on load; use the ⟳ Refresh button on the Receipts page, or reload the page. Also check Drive has finished syncing (tick icon). |
 | Duplicate receipt warning | You already issued this receipt. Proceeding re-issues with the **same** number and overwrites the same PDF — safe if you meant to re-issue. |
-| Invoice PDF missing a Material Adjustment | Material Adjustment notes print even when the amount is $0 — check the note is in column L of the right row. (Lesson Adjustment, column M/N, never prints — that's expected, see "Recent changes" above.) |
+| Invoice PDF missing an Adjustment line | The Adjustment line only prints when the amount in column K is not zero. A note in column L never prints on its own — column L is internal (see "Recent changes" above). |
 | A date shows as a number like `46216` in the app or on a receipt | You're running an outdated version of the app — install the current installer from the Drive folder. Current versions read Excel dates correctly. |
 
 ---
@@ -249,5 +290,5 @@ Admins can ignore this section.
   Every past version stays archived under Releases, so you can roll back by downloading an older one. Local one-off builds still work: `npm run build` then `npm run dist` inside `app/`.
 - **Source code:** the `INVOICE ACCELLEARN` project folder (repo `accellearn_invoice`, scoped to `app/`). Next.js 16 + Electron.
 - **Per-machine app config** (folder paths, invoice template): `%APPDATA%\app\data\template.json` — but always prefer editing via the in-app Settings pages.
-- **Receipt history:** the master spreadsheet is the source of truth — column **R** (Receipt Issued) and column **U** (Receipt Sent), written automatically on generate / Mark as Sent and parsed back on load. Receipt numbers are deterministic (`R-<TERMSLUG>-<serial padded to 3>`), so nothing needs to be looked up or carried between machines. A local **ledger** (`receipts-ledger.json`, alongside the config; serial numbers only, no names, by PDPA design) is kept as a **secondary cache** — it only matters when the spreadsheet was open in Excel and the write-back failed, in which case it is the only record of the issuance. Status is the union of the two sources, so a missing or wiped ledger degrades gracefully instead of causing silent duplicate receipts.
+- **Receipt history:** the master spreadsheet is the source of truth — column **P** (Receipt Issued) and column **S** (Receipt Sent), written automatically on generate / Mark as Sent and parsed back on load. Receipt numbers are deterministic (`R-<TERMSLUG>-<serial padded to 3>`), so nothing needs to be looked up or carried between machines. A local **ledger** (`receipts-ledger.json`, alongside the config; serial numbers only, no names, by PDPA design) is kept as a **secondary cache** — it only matters when the spreadsheet was open in Excel and the write-back failed, in which case it is the only record of the issuance. Status is the union of the two sources, so a missing or wiped ledger degrades gracefully instead of causing silent duplicate receipts.
 - The app runs entirely on the local machine (localhost, random port); no data leaves the computer except files written to the Drive folder.

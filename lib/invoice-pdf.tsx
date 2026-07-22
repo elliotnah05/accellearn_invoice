@@ -153,26 +153,17 @@ interface Props {
 
 export function InvoicePDF({ student: s, logoBase64, config }: Props) {
   // One invoice per child: a block of line items per subject.
-  // Adjustment notes are always printed when present — even when the dollar
-  // amount is zero (e.g. "make-up lesson done, no charge"), so the parent sees
-  // the explanation the admin recorded.
-  //
-  // Lesson Adjustment is the exception: per the owner, it's kept in the Excel
-  // for the admin's own reference only and must never appear on the invoice.
-  // Its dollar value still silently rolls into the Grand Total via
-  // SubjectLine.subtotal (see types/student.ts) — only the printed line is
-  // suppressed here.
+  // The Adjustment prints as a bare amount (negative = discount). Its NOTES
+  // column is the admin's internal record and must never reach the parent, so
+  // nothing is printed when the amount is zero — a $0 adjustment has nothing to
+  // say without its note.
   const rows: { item: string; qty: string; total: string }[] = [];
   for (const line of s.subjects) {
     const tag = line.subject ? ` — ${line.subject}` : "";
     rows.push({ item: `Lesson Fee${tag}`, qty: String(line.lessons), total: fmtSGD(line.lessonFee) });
     rows.push({ item: `Material Fee${tag}`, qty: "1", total: fmtSGD(line.materialFee) });
-    if (line.materialAdjustment !== 0 || line.materialAdjustmentNotes) {
-      rows.push({
-        item: `Material Adjustment${tag}${line.materialAdjustmentNotes ? ` (${line.materialAdjustmentNotes})` : ""}`,
-        qty: "-",
-        total: line.materialAdjustment !== 0 ? fmtSGD(line.materialAdjustment) : "—",
-      });
+    if (line.adjustment !== 0) {
+      rows.push({ item: `Adjustment${tag}`, qty: "-", total: fmtSGD(line.adjustment) });
     }
   }
   const items = rows.map((r, i) => ({ no: `${i + 1}.`, ...r }));
