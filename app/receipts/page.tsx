@@ -4,16 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { subjectsText, type Student, type ParseResult } from "@/types/student";
 import type { LedgerEntry } from "@/lib/billing-store";
+import { receiptState } from "@/lib/receipt-status";
 import { isDesktop, openFolder } from "@/lib/desktop";
 
 function fmtCurrency(n: number) {
   return `$${n.toFixed(2)}`;
-}
-
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
 }
 
 /** Admin conventions vary — treat any non-empty value that isn't "no"/"n" as paid. */
@@ -74,10 +69,15 @@ export default function ReceiptsPage() {
     } catch { /* server down — leave as-is */ }
   }
 
+  /** Spreadsheet first (shared between all admins), local ledger as backup. */
+  function stateFor(s: Student) {
+    return receiptState(s, entries[s.serialNo]);
+  }
+
   function rowStatus(s: Student): RowStatus {
-    const e = entries[s.serialNo];
-    if (e?.sentAt) return "sent";
-    if (e) return "generated";
+    const st = stateFor(s);
+    if (st?.sent) return "sent";
+    if (st) return "generated";
     return isPaid(s) ? "ready" : "unpaid";
   }
 
@@ -256,7 +256,7 @@ export default function ReceiptsPage() {
           <div className="flex flex-col divide-y divide-gray-100">
             {students.map((s) => {
               const st = rowStatus(s);
-              const e = entries[s.serialNo];
+              const rs = stateFor(s);
               const isBusy = busy.has(s.serialNo);
               return (
                 <div key={s.serialNo} className="py-3 flex items-center gap-4">
@@ -265,7 +265,7 @@ export default function ReceiptsPage() {
                     <p className="text-xs text-gray-400">
                       {s.parentName} · {subjectsText(s)} ({s.level})
                       {s.dateOfReceipt && <span> · paid {s.dateOfReceipt}</span>}
-                      {e && <span className="text-gray-500 font-mono"> · {e.receiptNo}</span>}
+                      {rs?.receiptNo && <span className="text-gray-500 font-mono"> · {rs.receiptNo}</span>}
                     </p>
                   </div>
                   <p className="font-bold text-sm shrink-0" style={{ color: "#AB33DA" }}>{fmtCurrency(s.totalFee)}</p>
@@ -279,10 +279,10 @@ export default function ReceiptsPage() {
                       <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700 font-semibold">Ready for receipt</span>
                     )}
                     {st === "generated" && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">Generated {fmtDate(e?.issuedAt)}</span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold">Generated {rs?.issued}</span>
                     )}
                     {st === "sent" && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-semibold">✓ Sent {fmtDate(e?.sentAt)}</span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-semibold">✓ Sent {rs?.sent}</span>
                     )}
                   </div>
 
@@ -345,12 +345,19 @@ export default function ReceiptsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
             <h3 className="font-bold text-gray-800 mb-2">⚠ Receipt already exists</h3>
-            <p className="text-sm text-gray-600 mb-1">
-              A receipt for <strong>{confirmDup.student.studentName}</strong> was already generated on{" "}
-              <strong>{fmtDate(confirmDup.entry.issuedAt)}</strong>{" "}
-              (<span className="font-mono text-xs">{confirmDup.entry.receiptNo}</span>
-              {confirmDup.entry.sentAt && <> — and marked <strong>sent on {fmtDate(confirmDup.entry.sentAt)}</strong></>}).
-            </p>
+            {(() => {
+              // Dates may come from the spreadsheet (another admin issued it) or
+              // from this machine's ledger — receiptState covers both.
+              const rs = receiptState(confirmDup.student, confirmDup.entry);
+              return (
+                <p className="text-sm text-gray-600 mb-1">
+                  A receipt for <strong>{confirmDup.student.studentName}</strong> was already generated
+                  {rs?.issued ? <> on <strong>{rs.issued}</strong></> : null}{" "}
+                  (<span className="font-mono text-xs">{rs?.receiptNo}</span>
+                  {rs?.sent && <> — and marked <strong>sent on {rs.sent}</strong></>}).
+                </p>
+              );
+            })()}
             <p className="text-sm text-gray-600 mb-4">
               Are you sure you want to create it again? It keeps the <strong>same receipt number</strong> and replaces the
               old file, so no duplicate receipt will exist.

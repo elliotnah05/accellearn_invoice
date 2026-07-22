@@ -8,6 +8,7 @@ import {
   readLedger, writeLedger, ledgerKey, receiptNo, termSlug,
   ensureOutputDir, safeFileName, outputFolderExists,
 } from "@/lib/billing-store";
+import { parseIssuedCell, parseSentCell } from "@/lib/receipt-status";
 import { writebackReceiptIssued, writebackReceiptSent } from "@/lib/sheet-writeback";
 import type { Student } from "@/types/student";
 import type { TemplateConfig } from "@/app/api/config/route";
@@ -65,11 +66,22 @@ export async function POST(request: NextRequest) {
   // ── Mark a receipt as sent (manual send by admin) ──
   if (body.action === "markSent") {
     const key = ledgerKey(body.term, body.serialNo);
-    const entry = ledger[key];
-    if (!entry) {
-      return Response.json({ error: "No receipt generated for this student yet." }, { status: 404 });
-    }
+    // The local ledger may be empty on this machine even though the receipt was
+    // genuinely issued (another admin's computer, or a fresh install after
+    // handover). The spreadsheet is the real record and the receipt number is
+    // deterministic, so rebuild the entry rather than refusing.
+    const entry = ledger[key] ?? {
+      serialNo: body.serialNo,
+      term: body.term,
+      receiptNo: receiptNo(body.term, body.serialNo),
+      amount: 0,
+      issuedAt: new Date().toISOString(),
+      reissuedAt: [],
+      sentAt: null,
+      file: "",
+    };
     entry.sentAt = new Date().toISOString();
+    ledger[key] = entry;
     writeLedger(ledger);
     const wb = await writebackReceiptSent(config, body.term, body.serialNo);
     return Response.json({ ok: true, entry, warning: wb.warning ?? null });
@@ -91,10 +103,27 @@ export async function POST(request: NextRequest) {
     const key = ledgerKey(body.term, s.serialNo);
     const existing = ledger[key];
 
-    // Duplicate guard: refuse without force so the UI can confirm with the admin
-    if (existing && !body.force) {
+    // Duplicate guard. Checks the spreadsheet (column R) as well as the local
+    // ledger, so the warning still fires on a machine that has never issued
+    // this receipt itself — the shared Excel is what both admins have in common.
+    const fromSheet = parseIssuedCell(s.receiptIssued);
+    if ((existing || fromSheet) && !body.force) {
       return Response.json(
-        { duplicate: true, entry: existing },
+        {
+          duplicate: true,
+          // No local record, but the sheet says it was issued. Hand back an
+          // entry-shaped object; the client fills the dates in from the sheet.
+          entry: existing ?? {
+            serialNo: s.serialNo,
+            term: body.term,
+            receiptNo: fromSheet?.receiptNo || receiptNo(body.term, s.serialNo),
+            amount: s.totalFee,
+            issuedAt: "",
+            reissuedAt: [],
+            sentAt: parseSentCell(s.receiptSent) ? "" : null,
+            file: "",
+          },
+        },
         { status: 409 }
       );
     }
