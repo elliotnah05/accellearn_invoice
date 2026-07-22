@@ -1,5 +1,5 @@
 import path from "path";
-import { existsSync, mkdirSync, copyFileSync } from "fs";
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from "fs";
 
 // Centralised filesystem locations for the app's server-side data.
 //
@@ -34,7 +34,26 @@ export function ensureDataDir(): void {
   for (const f of ["template.json", "receipts-ledger.json"]) {
     const dest = path.join(DATA_DIR, f);
     const src = path.join(BUNDLED_CONFIG_DIR, f);
-    if (!existsSync(dest) && existsSync(src)) copyFileSync(src, dest);
+    if (existsSync(dest) || !existsSync(src)) continue;
+
+    // template.json is bundled from the maintainer's working copy, so it carries
+    // whatever folder paths that machine happened to use. Those are meaningless
+    // on someone else's computer (wrong drive letter, wrong OS, or a folder that
+    // simply isn't there) and are worse than blank: the admin has to notice and
+    // replace a plausible-looking path instead of filling in an empty box.
+    // Every install picks its own folders in Settings, so seed them empty.
+    if (f === "template.json") {
+      try {
+        const seed = JSON.parse(readFileSync(src, "utf8"));
+        seed.outputFolder = "";
+        seed.spreadsheetPath = "";
+        writeFileSync(dest, JSON.stringify(seed, null, 2), "utf8");
+        continue;
+      } catch {
+        // Malformed bundle — fall through to a plain copy rather than no config.
+      }
+    }
+    copyFileSync(src, dest);
   }
 }
 
