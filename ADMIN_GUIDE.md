@@ -1,21 +1,19 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App name:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 22 July 2026 (v0.3.0 — new column layout)
+**Last updated:** 23 July 2026 (v0.4.0 — Master tab)
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
 
 ---
 
-## 📌 Recent changes you should know about (v0.3.0)
+## 📌 Recent changes you should know about (v0.4.0)
 
-- **⚠️ There is now ONE master file: `student details LATEST.xlsx`.** Every other copy has been retired. If you have an older `student details NEW.xlsx` anywhere, do not use it — its columns are in the old order and the app will read the wrong values out of it.
-- **The two adjustment columns are now a single "Adjustment".** Material Adjustment and Lesson Adjustment (which used to be columns K–N) are merged into **column K — Adjustment ($)** plus **column L — Adjustment Notes**. Type a **minus** to reduce the bill (`-80`) or a plain number to add to it (`90`). Your totals have not changed: every student's Grand Total is exactly what it was before the merge.
-- **Adjustment Notes are never printed.** Column L is your internal record only — it does not appear on the invoice or the receipt. The **amount** in column K does print, as a single "Adjustment" line under that subject.
-- **Everything after column L shifted two letters left.** Because two columns disappeared, the status columns moved: Invoice Issued is now **M**, Paid is **N**, Date of Receipt **O**, Receipt Issued **P**, Different End Date **Q**, Backed Up **R**, Receipt Sent **S**. The sheet ends at **S** instead of U. See the full table in section 4.
-- **New: `student details TEMPLATE.xlsx`.** A blank, correctly-formatted copy sitting next to the master. Start each new term from it instead of copying and pasting between sheets — see section 4a.
-- **Receipt history now lives in the spreadsheet, not on one computer.** The app decides whether a receipt already exists by reading column **P** of the master file in the shared Drive folder. Previously it also relied on a record kept on the machine that issued it, which meant a *different* computer — a new admin, or the owner after handover — could re-issue a receipt without any warning. Now every computer sees the same history automatically, with nothing to copy across or set up. **What this means for you:** never clear columns P or S by hand (see Receipts, step 5).
-- **Column N ("Paid") — read the warning in section 4.** Writing `pending`, `TBC`, or `partial` in that column makes the app treat the child as **fully paid**. Leave the cell completely empty until the money is actually in. (This column used to be P.)
-- **The Import Sheet review table now has resizable columns.** Drag the right edge of any column header left or right to widen or narrow it — handy for reading a long adjustment note in full without opening the spreadsheet. Works just like resizing a column in Excel. Widths are just for your current viewing session and reset next time you load the sheet.
+- **⭐ You never have to retype or copy-paste student details again.** The workbook now has a **`Master`** tab holding columns **A–H** — Serial No, Student Name, Parent Name, POC, Level, Subject, Duration and Rate. That is the one and only place a student is ever typed in.
+- **Every term tab reads A–H from Master automatically.** Add a new child to Master once and they appear on the current term — and on every future term — by themselves. Change a phone number on Master and it updates everywhere.
+- **A–H are locked on the term tabs.** If you click one you'll see it contains a formula and Excel won't let you type over it. That is deliberate: it's what stops the columns drifting out of line. To change any of those details, **edit Master**.
+- **Everything from column I onwards still belongs to the term** and is freely editable — Lessons, Material Fee, Adjustment, and all the status columns.
+- **Starting a new term is now one right-click** — copy the term tab, rename it, clear columns I–S. Section 4a walks through it. The old separate template file is no longer needed.
+- **Finished terms should be "frozen"** so a later rate change on Master can't rewrite history. One-off step per term, section 4a.
 
 ---
 
@@ -111,9 +109,18 @@ Remember to click **Save Changes** when done — a green "✓ Changes have been 
 
 This is the most important section. The spreadsheet is the **single source of truth** — the app reads it live and writes receipt status back into it.
 
-**The file:** `student details LATEST.xlsx` in the shared Drive folder. This is the **only** master — if you find an older `student details LATEST.xlsx` anywhere, it is retired and must not be used. The **sheet (tab) name is the term** — e.g. `AY 26 T3` — and it becomes the PDF folder name, so name it sensibly.
+**The file:** `student details LATEST.xlsx` in the shared Drive folder. It contains:
 
-### Column layout (do not rename, reorder, insert, or delete columns)
+| Tab | What it holds | Who edits it |
+|-----|---------------|--------------|
+| **`Master`** (first tab) | Columns **A–H** only — the details that stay the same term after term | **You.** This is the only place a student is typed in |
+| **`AY 26 T3`** (and one tab per term after it) | Columns **A–H pulled from Master automatically** + columns **I–S** for that term | You edit **I–S** only; A–H look after themselves |
+
+⚠️ **The current term must be the first tab after Master.** That is how the app knows which term to bill. If you add `AY 26 T4`, drag it so it sits immediately after Master when it becomes the live term.
+
+### The `Master` tab — columns A–H
+
+One row per **subject**. A child taking two subjects has two rows here, with A–E merged across them.
 
 | Col | Field | What to type — with example | Notes |
 |-----|-------|------------------------------|-------|
@@ -125,6 +132,15 @@ This is the most important section. The spreadsheet is the **single source of tr
 | F | Subject | `Mathematics` | One subject per row |
 | G | Duration (hrs) | `2` | Hours per lesson (blank = 2) |
 | H | Rate/hr ($) | `55` | Number only, no $ sign. **Required** — the app flags rows missing this |
+
+**To add a new student:** type them into the next free row on Master. They appear on the term tab immediately. Rows are linked down to **row 201**, so there is room for roughly 185 more rows before anything needs extending.
+
+### The term tab — columns I–S
+
+Columns A–H here are **locked formulas** showing what's on Master. Everything below is yours to fill in for that term:
+
+| Col | Field | What to type — with example | Notes |
+|-----|-------|------------------------------|-------|
 | I | Lessons | `12` | Number of lessons in the term (blank = 12) |
 | J | Material Fee ($) | `30` | Number only; leave blank or `0` if none |
 | K | Adjustment ($) | `-80` or `90` | **One figure, plus or minus.** Minus reduces the bill (missed lessons, discount, shorter lessons); a plain number adds to it (extra session, assessment book). Prints on the invoice as a single "Adjustment" line for that subject. Leave blank or `0` if none |
@@ -172,11 +188,15 @@ The Adjustment is added, so a **negative** number subtracts. Worked example — 
 
 ### Children with more than one subject — the merged-cell rule
 
-One row = one subject. A child taking two subjects takes **two rows**, grouped like this:
+One row = one subject. A child taking two subjects takes **two rows**.
+
+**On the `Master` tab:**
 
 - Put the child's details (columns A–E) on the **first** row only.
-- **Merge** columns A–E and M–S vertically across the child's rows (select the cells → Merge & Center). At minimum, leave Student Name (B) **blank** on the extra rows — a blank/merged name cell is how the app knows "this row is another subject for the child above".
-- Each row keeps its own subject columns F–L.
+- **Merge** columns A–E vertically across the child's rows (select the cells → Merge & Center). At minimum, leave Student Name (B) **blank** on the extra rows — a blank/merged name cell is how the app knows "this row is another subject for the child above".
+- Columns **F, G, H** (Subject, Duration, Rate) stay filled in on **every** row, because they differ per subject.
+
+**On the term tab:** you don't need to do anything. Columns A–H are formulas, and the continuation row simply comes through blank — exactly the blank the app is looking for. Do merge the **status columns M–S** across the child's rows, since those belong to the child rather than to one subject.
 
 ⚠️ **Never repeat the child's name on the second row.** The app will treat it as a duplicate child, warn about the reused serial, and could produce two invoices. Blank or merged = same child; name filled in = new child.
 
@@ -205,25 +225,52 @@ If you need to record chasing notes, part payments, or "parent says they'll pay 
 - **Close the spreadsheet before generating receipts.** If the file is open in Excel, the receipt PDF still generates but the app can't write columns P/S — it will warn you, and you must fill in the cell by hand (or close Excel and re-generate).
 - **Header row stays on row 1.** Data starts from row 2.
 - **Make a backup copy before big edits** (e.g. setting up a new term). Just copy the file in Drive and add the date to the name.
-- **New term = new file or new tab** named after the term (e.g. `AY 26 T4`), same column layout. Start it from the template — see section 4a. Then update Settings → Folders if the file name changed, and update the term schedule in Settings.
+- **Never delete or rename the `Master` tab**, and don't move it off the front. Every term tab reads from it by name.
+- **New term = a copy of the term tab**, named after the term (e.g. `AY 26 T4`) — see section 4a. Then update the term schedule in Settings.
 - The file must stay under **10 MB** (it will be nowhere near this in normal use).
 
 ---
 
-## 4a. Starting a new term — use the template file
+## 4a. Adding students, starting a term, closing a term
 
-Sitting next to the master is **`student details TEMPLATE.xlsx`**: an empty sheet with the correct headers, colours, column widths and frozen header row, and **nothing else**. It exists so that setting up a term never involves copying and pasting blocks of cells between spreadsheets — which is how columns end up shifted by one and every invoice comes out wrong.
+### Adding a new student — 30 seconds
 
-**To start a new term:**
+1. Open **`student details LATEST.xlsx`** and go to the **`Master`** tab.
+2. Type the child into the next free row: Serial No, Name, Parent, POC, Level, Subject, Duration, Rate (columns A–H).
+3. If they take two subjects, add a second row for the second subject, leave the name blank on it, and merge A–E across both rows.
+4. Save.
 
-1. In Drive, right-click `student details TEMPLATE.xlsx` → **Make a copy**. Rename the copy to the new term, e.g. `student details LATEST AY 26 T4.xlsx` — or add a new tab to the existing master and paste the template's header row into it.
-2. Rename the **tab** to the term (e.g. `AY 26 T4`). The template ships with its tab called `NEW TERM (rename this tab)` precisely so a forgotten rename is impossible to miss — the tab name becomes the PDF folder name.
-3. Fill in **columns A–H** for each child — Serial No, Student Name, Parent Name, POC, Level, Subject, Duration, Rate. **These eight columns never change between terms**, so you can safely copy them down from last term's sheet in one block.
-4. Fill in **I (Lessons)**, **J (Material Fee)** and, where needed, **K/L (Adjustment and its note)** for the new term.
-5. Leave **M–S** (the status columns) completely empty. The app fills P and S in for you; M, N, O, Q and R are yours to fill as the term runs.
-6. Point the app at the new file: **Settings → Folders → Spreadsheet path**.
+That's it. They now appear on the current term tab automatically. Go to that tab and fill in their **Lessons (I)** and **Material Fee (J)** for this term.
 
-⚠️ **Never insert, delete or reorder a column**, in the template or the master. The app finds every field by its column position, not by its heading — a single inserted column silently shifts everything after it and the app will read material fees as lesson counts. If a column heading looks wrong, retype the heading; don't move the column.
+### Starting a new term
+
+1. Right-click the current term tab (e.g. `AY 26 T3`) → **Move or Copy…** → tick **Create a copy** → OK.
+2. Rename the copy to the new term, e.g. **`AY 26 T4`**. The tab name becomes the PDF folder name, so name it sensibly.
+3. On the new tab, **clear columns I–S** (the term's own data and status). **Leave A–H alone** — they're formulas and keep working by themselves.
+4. Drag the new tab so it sits **immediately after `Master`**. The app always bills from the first tab after Master, so this is what makes it the live term.
+5. Fill in **Lessons (I)** and **Material Fee (J)** for the term, plus any **Adjustment (K/L)**.
+6. Update the term dates in **Settings → Clause 2 Term Schedule** so the invoices print the right period.
+
+Nothing is ever copied and pasted between sheets, so the columns cannot drift out of line.
+
+### Closing a term — "freezing" it
+
+When a term is finished and all its invoices and receipts have gone out, freeze it.
+
+**Why:** columns A–H on a term tab are live links to Master. If you raise a rate on Master next year, that old term would quietly show the new rate and stop matching the invoices parents were actually sent. Freezing turns the links into plain text so the tab becomes a permanent record.
+
+**How (in Excel, takes 10 seconds):**
+
+1. Go to the finished term's tab.
+2. Select **A2:H201**.
+3. **Copy** (Ctrl+C), then **Paste Special → Values** (right-click → Paste Options → the `123` icon).
+4. Save.
+
+The tab looks identical — the difference is it no longer changes when Master changes. Do this **only** to terms that are over, never to the current one.
+
+*(For the maintainer: `node scripts/freeze-term.js "<workbook>" "AY 26 T3"` does the same thing, with `--dry-run` to preview. It refuses to touch the Master tab.)*
+
+⚠️ **Never insert, delete or reorder a column** on any tab. The app finds every field by its column position, not by its heading — a single inserted column silently shifts everything after it and the app will read material fees as lesson counts. If a column heading looks wrong, retype the heading; don't move the column.
 
 ## 5. Data protection (PDPA) — non-negotiable
 
@@ -271,10 +318,15 @@ Clear columns **P** (Receipt Issued) and **S** (Receipt Sent) of any practice en
 | Child not appearing as ready for receipt | Column N (Paid) is empty, or contains "no"/"n". |
 | A child shows as "ready for receipt" but hasn't actually paid | Column N contains a note like `pending`, `TBC`, `partial` or `chasing` — the app counts **any** text as paid. Clear the cell completely (section 4, "Paid rule"). |
 | Child shows "Generated"/"Sent" but you never issued it on this computer | Correct and expected — another admin issued it and the spreadsheet remembers. Nothing to fix. |
-| No duplicate warning when you expected one | Column R was cleared or overwritten by hand. That column is how the app remembers — restore it, or use *Re-generate* rather than deleting. |
+| No duplicate warning when you expected one | Column P was cleared or overwritten by hand. That column is how the app remembers — restore it, or use *Re-generate* rather than deleting. |
 | App shows outdated numbers | The pages read live on load; use the ⟳ Refresh button on the Receipts page, or reload the page. Also check Drive has finished syncing (tick icon). |
 | Duplicate receipt warning | You already issued this receipt. Proceeding re-issues with the **same** number and overwrites the same PDF — safe if you meant to re-issue. |
 | Invoice PDF missing an Adjustment line | The Adjustment line only prints when the amount in column K is not zero. A note in column L never prints on its own — column L is internal (see "Recent changes" above). |
+| Excel won't let me type in columns A–H on a term tab | Working as intended — those are linked to the `Master` tab and locked so they can't drift. Make the change on **Master** and it updates here automatically (Section 4a). |
+| A student I added to Master isn't showing on the term tab | Check three things: they went on **Master** (not the term tab); their row is at or above **row 201**, where the links stop; and the file has been **saved**. If the row is below 201, copy the row above it down to extend the links. |
+| A term tab shows `0` where a name should be | The link lost its blank-check. Each cell should read `=IF(Master!B2="","",Master!B2)` — the `IF` is what turns an empty Master cell into a blank instead of a zero. |
+| An old term's fees changed by themselves | That term was never frozen, so it's still linked to Master and followed a rate change. Freeze finished terms — Section 4a, "Closing a term". |
+| The app is billing the wrong term | It always uses the **first tab after `Master`**. Drag the term you want to bill so it sits immediately after Master. |
 | A date shows as a number like `46216` in the app or on a receipt | You're running an outdated version of the app — install the current installer from the Drive folder. Current versions read Excel dates correctly. |
 
 ---
@@ -290,5 +342,9 @@ Admins can ignore this section.
   Every past version stays archived under Releases, so you can roll back by downloading an older one. Local one-off builds still work: `npm run build` then `npm run dist` inside `app/`.
 - **Source code:** the `INVOICE ACCELLEARN` project folder (repo `accellearn_invoice`, scoped to `app/`). Next.js 16 + Electron.
 - **Per-machine app config** (folder paths, invoice template): `%APPDATA%\app\data\template.json` — but always prefer editing via the in-app Settings pages.
+- **Workbook shape:** tab 1 is `Master` (identity columns A–H, typed once). Every following tab is a term and pulls A–H with plain per-cell formulas `=IF(Master!A2="","",Master!A2)` down to row 201. Deliberately **not** IFERROR (a blank source is not an error — it evaluates to 0, which would show as zeros) and deliberately **no** dynamic-array/spill formulas (XLOOKUP/FILTER/Table[#Data]), which do not survive being written by script and reopened. Identity columns are locked with sheet protection on (no password); I–S unlocked.
+- **Sheet selection:** billing always targets the first worksheet whose name is not `Master` (`activeTermSheet()` in `lib/parse-students.ts`). Falling back to sheet index 0 — as older versions did — bills from Master and silently produces invoices with lessons defaulted to 12, $0 material fees and nobody marked paid.
+- **Formula cells and cached values:** the app reads Excel's *cached* results, so a workbook whose formulas were written by a script must be opened and saved in Excel once before the app can read it. Day-to-day editing in Excel does this automatically. `lib/sheet-writeback.ts` resolves `{formula, result}` cells when matching serial numbers — reading the raw value yields NaN and would break write-back for every student.
+- **Freezing a term:** `scripts/freeze-term.js <workbook> <tab>` converts A–H formulas to values (`--dry-run` supported). Refuses the Master tab, and aborts if no identity cell has a calculated value, since a formula that evaluates to blank is stored without a cached result and is otherwise indistinguishable from one Excel has never calculated.
 - **Receipt history:** the master spreadsheet is the source of truth — column **P** (Receipt Issued) and column **S** (Receipt Sent), written automatically on generate / Mark as Sent and parsed back on load. Receipt numbers are deterministic (`R-<TERMSLUG>-<serial padded to 3>`), so nothing needs to be looked up or carried between machines. A local **ledger** (`receipts-ledger.json`, alongside the config; serial numbers only, no names, by PDPA design) is kept as a **secondary cache** — it only matters when the spreadsheet was open in Excel and the write-back failed, in which case it is the only record of the issuance. Status is the union of the two sources, so a missing or wiped ledger degrades gracefully instead of causing silent duplicate receipts.
 - The app runs entirely on the local machine (localhost, random port); no data leaves the computer except files written to the Drive folder.
