@@ -56,9 +56,26 @@ function dateVal(row: Row, idx: number): string {
   return cellVal(row, idx);
 }
 
+/** The workbook holds a "Master" tab (identity columns A–H, the single place a
+ *  child is ever typed in) followed by one tab per term. Billing always comes
+ *  from a TERM tab — never Master, which has no fees on it and would silently
+ *  produce invoices with defaulted lessons and nobody marked paid.
+ *  The active term is the first tab after Master. */
+export const MASTER_SHEET = "Master";
+
+export function isMasterSheet(name: string): boolean {
+  return name.trim().toLowerCase() === MASTER_SHEET.toLowerCase();
+}
+
+/** First tab that isn't Master; falls back to the first tab for older
+ *  single-sheet workbooks that have no Master at all. */
+export function activeTermSheet(names: string[]): string {
+  return names.find((n) => !isMasterSheet(n)) ?? names[0];
+}
+
 export function parseWorkbook(buffer: Buffer): ParseResult {
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
-  const sheetName = wb.SheetNames[0];
+  const sheetName = activeTermSheet(wb.SheetNames);
   const ws = wb.Sheets[sheetName];
 
   const raw = XLSX.utils.sheet_to_json<Row>(ws, {

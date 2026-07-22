@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { existsSync } from "fs";
 import type { TemplateConfig } from "@/app/api/config/route";
+import { isMasterSheet } from "@/lib/parse-students";
 
 // Writes receipt status back into the master spreadsheet so Excel and the app
 // always tell the same story. Best-effort: if the file is open in Excel
@@ -26,7 +27,12 @@ async function withSheet(
   try {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(file);
-    const ws = wb.getWorksheet(term) ?? wb.worksheets[0];
+    // Never fall back onto the Master tab: it carries no receipt columns, so a
+    // write there would be silently lost. Fall back to the active term instead.
+    const ws =
+      wb.getWorksheet(term) ??
+      wb.worksheets.find((w) => !isMasterSheet(w.name)) ??
+      wb.worksheets[0];
     if (!ws) return { ok: false, warning: "No worksheet found — Excel not updated." };
     fn(ws);
     await wb.xlsx.writeFile(file);
@@ -42,13 +48,24 @@ async function withSheet(
   }
 }
 
+/** Serial numbers on a term sheet are formulas pulling from Master, so the raw
+ *  cell value is a {formula, result} object rather than a number. Reading that
+ *  directly yields NaN and the row is never found — i.e. write-back would fail
+ *  for every single student. Resolve the cached result first. */
+function cellNumber(cell: ExcelJS.Cell): number {
+  const v = cell.value;
+  if (v && typeof v === "object" && "result" in v) {
+    return Number((v as ExcelJS.CellFormulaValue).result);
+  }
+  return Number(v);
+}
+
 function findRowBySerial(ws: ExcelJS.Worksheet, serialNo: number): ExcelJS.Row | null {
   // rowCount = last used row number. actualRowCount (the count of non-empty
   // rows) would stop the scan short the moment anyone leaves a blank row in the
   // middle of the sheet, silently skipping every student below it.
   for (let r = 2; r <= ws.rowCount; r++) {
-    const v = ws.getRow(r).getCell(1).value;
-    if (Number(v) === serialNo) return ws.getRow(r);
+    if (cellNumber(ws.getRow(r).getCell(1)) === serialNo) return ws.getRow(r);
   }
   return null;
 }
