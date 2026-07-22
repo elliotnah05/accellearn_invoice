@@ -204,6 +204,9 @@ When an admin changes, the owner does this:
 1. Remove their Google account from the Drive folder's sharing list.
 2. Ask them to uninstall the app (Windows: Settings → Apps → AccelLearn Invoices; Mac: drag the app from Applications to Trash) and confirm no copies of the spreadsheet/PDFs remain on their machine (check their Drive for desktop is signed out or the offline copy removed).
 
+**Before handing over a spreadsheet that was used for testing**
+Clear columns **R** (Receipt Issued) and **U** (Receipt Sent) of any practice entries first. The app treats those columns as the real record, so leftover test values make children look like they already have receipts — and trigger a false "already exists" warning when the genuine one is issued. Leave column P (Paid) alone if you want the new admin to be able to try generating a receipt straight away.
+
 **On-boarding the new admin**
 1. Share the Drive folder `accellearn-invoice-reciept` with their Google account (Editor).
 2. Send them a **link**, not files — the installers are large (155 MB Windows, 271 MB Mac) and both already sit in the Drive folder under `App Installer`, alongside this guide. Once they have Drive access there is nothing to send at all. (Chat apps also tend to flag or block `.exe` attachments.)
