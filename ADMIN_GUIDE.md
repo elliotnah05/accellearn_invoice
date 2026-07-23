@@ -1,12 +1,20 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App name:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 23 July 2026 (v0.6.0 — 500 rows, colour-bleed fix)
+**Last updated:** 23 July 2026 (v0.7.0 — receipt preview, all term tabs ready)
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
 
 ---
 
-## 📌 Recent changes you should know about (v0.6.0)
+## 📌 Recent changes you should know about (v0.7.0)
+
+- **You can now preview a receipt before issuing it.** The Receipts page has a **Preview** button on every row — it opens the exact PDF the parent would get in a pop-up (with a Download button), just like the invoice preview. **Previewing changes nothing:** no file is saved, no receipt number is used up, and the spreadsheet is not touched. Only *Generate Receipt* commits anything. Use it to eye-check the amount and dates first.
+- **All four term tabs already exist in the workbook.** `student details LATEST.xlsx` now ships with **`AY 26 T2`, `AY 26 T3` and `AY 26 T4`** tabs. `T2` and `T4` are **blank and ready** — their A–H columns already link to Master; you just fill in Lessons/Adjustments/status when that term comes around. Starting one of those terms no longer means copying a tab — see section 4a.
+- **Small wording fix.** The editable import table's column now reads **"Adjustment Notes"** in full (was "Adj Notes"). Same column, clearer label — nothing else changed.
+
+---
+
+## 📌 Earlier changes (v0.6.0)
 
 - **The sent/receipt colour now fills just the one cell.** Marking a receipt sent colours **only** the Receipt Issued cell (green), not the whole row as before. Generating colours only that cell red.
 - **Room for more students.** The linked rows now run to **row 500** (were 201), so you can keep adding people to Master for years without extending anything.
@@ -98,10 +106,11 @@ The home page should show a green **"Connected — N students from …"** banner
 ### Receipts
 
 1. A child appears as **ready for a receipt** once their **Paid** column in the spreadsheet is filled in (see section 4).
-2. **Generate** writes the PDF to **`Receipts\<term>\`** and automatically writes back into the spreadsheet: column **O** (Receipt Issued) gets the receipt number and date, and the cell turns **red** (issued, not yet sent).
-3. **Mark as Sent** after you've sent it to the parent — ✅ **this DOES edit the master spreadsheet for you**, writing column **R** (Receipt Sent), e.g. `Sent 19/07/26`, and turning the Receipt Issued cell (column O) from red to **green**. (Generating the receipt in step 2 writes column O.) You don't have to fill these in by hand — unless the spreadsheet was open in Excel at the time, in which case the app can't write and warns you.
-4. Receipt numbers are automatic and fixed: `R-AY26T3-013` = term AY 26 T3, serial 13. **Re-generating the same receipt can never create a second conflicting number** — the app warns you it's a duplicate and, if you proceed, overwrites the same file.
-5. **The spreadsheet is what remembers.** The app knows a receipt already exists because column **O** (Receipt Issued) is filled in — not because of anything stored on your computer. That means the duplicate warning works **on any computer, for any admin**: a brand-new install reads the same shared spreadsheet and immediately knows the full history. Nothing is lost when an admin changes machines or hands over.
+2. **Preview** (on every row) opens the receipt PDF in a pop-up so you can check the amount, dates and name before committing — **nothing is saved or issued**, and no receipt number is used. Optional, but handy for a quick sanity check.
+3. **Generate** writes the PDF to **`Receipts\<term>\`** and automatically writes back into the spreadsheet: column **O** (Receipt Issued) gets the receipt number and date, and the cell turns **red** (issued, not yet sent).
+4. **Mark as Sent** after you've sent it to the parent — ✅ **this DOES edit the master spreadsheet for you**, writing column **R** (Receipt Sent), e.g. `Sent 19/07/26`, and turning the Receipt Issued cell (column O) from red to **green**. (Generating the receipt in step 3 writes column O.) You don't have to fill these in by hand — unless the spreadsheet was open in Excel at the time, in which case the app can't write and warns you.
+5. Receipt numbers are automatic and fixed: `R-AY26T3-013` = term AY 26 T3, serial 13. **Re-generating the same receipt can never create a second conflicting number** — the app warns you it's a duplicate and, if you proceed, overwrites the same file.
+6. **The spreadsheet is what remembers.** The app knows a receipt already exists because column **O** (Receipt Issued) is filled in — not because of anything stored on your computer. That means the duplicate warning works **on any computer, for any admin**: a brand-new install reads the same shared spreadsheet and immediately knows the full history. Nothing is lost when an admin changes machines or hands over.
    ⚠️ The flip side: **do not clear or overwrite columns O and R by hand.** Wiping them tells the app the receipt never happened, and it will silently issue a second one. If a receipt genuinely needs re-doing, use the *Re-generate* button — it keeps the same number and replaces the same file.
 
 ### Status
@@ -127,14 +136,16 @@ Remember to click **Save Changes** when done — a green "✓ Changes have been 
 
 This is the most important section. The spreadsheet is the **single source of truth** — the app reads it live and writes receipt status back into it.
 
-**The file:** `student details LATEST.xlsx` in the shared Drive folder. It contains:
+**The file:** `student details LATEST.xlsx` in the shared Drive folder. It has a **`Master`** tab followed by **one tab per term** (`AY 26 T2`, `AY 26 T3`, `AY 26 T4`):
 
 | Tab | What it holds | Who edits it |
 |-----|---------------|--------------|
-| **`Master`** (first tab) | Columns **A–H** only — the details that stay the same term after term | **You.** This is the only place a student is typed in |
-| **`AY 26 T3`** (and one tab per term after it) | Columns **A–H pulled from Master automatically** + columns **I–R** for that term | You edit **I–R** only; A–H look after themselves |
+| **`Master`** (first tab) | Columns **A–H only** — the details that stay the same term after term (name, parent, level, subject, rate…) | **You.** This is the one and only place a student is ever typed in |
+| **Term tabs** (`AY 26 T2`, `AY 26 T3`, `AY 26 T4`) | Columns **A–H pulled from Master automatically** + columns **I–R** you fill in for that one term (lessons, adjustment, paid, receipts…) | You edit **I–R only**; A–H look after themselves |
 
-⚠️ **The current term must be the first tab after Master.** That is how the app knows which term to bill. If you add `AY 26 T4`, drag it so it sits immediately after Master when it becomes the live term.
+**The golden rule in one line:** *type student details on **Master**, type each term's billing on that **term's tab (columns I–R)**, and never touch A–H on a term tab — they mirror Master by formula.*
+
+⚠️ **The current term must be the first tab after Master.** That is how the app knows which term to bill. Right now that's **`AY 26 T3`**. When `AY 26 T4` becomes the live term, drag its tab so it sits immediately after Master. (`T2` and `T4` already exist but are blank — they only "go live" when you drag them to the front and start filling them in.)
 
 ### The `Master` tab — columns A–H
 
@@ -269,14 +280,20 @@ That's it. They now appear on the current term tab automatically. Go to that tab
 
 ### Starting a new term
 
-1. Right-click the current term tab (e.g. `AY 26 T3`) → **Move or Copy…** → tick **Create a copy** → OK.
-2. Rename the copy to the new term, e.g. **`AY 26 T4`**. The tab name becomes the PDF folder name, so name it sensibly.
-3. On the new tab, **clear columns I–R** (the term's own data and status). **Leave A–H alone** — they're formulas and keep working by themselves.
-4. Drag the new tab so it sits **immediately after `Master`**. The app always bills from the first tab after Master, so this is what makes it the live term.
-5. Fill in **Lessons (I)** for the term, plus any **Adjustment (J/K)**.
-6. Update the term dates in **Settings → Clause 2 Term Schedule** so the invoices print the right period.
+**The easy case — the tab already exists.** `AY 26 T2`, `AY 26 T3` and `AY 26 T4` are all in the workbook already, with `T2` and `T4` sitting blank and ready. To start one of them:
 
-Nothing is ever copied and pasted between sheets, so the columns cannot drift out of line.
+1. Drag its tab so it sits **immediately after `Master`**. The app always bills from the first tab after Master, so this is what makes it the live term.
+2. Its A–H columns are already linked to Master — **leave them alone**. Fill in **Lessons (I)** for the term, plus any **Adjustment (J)** and **Adjustment Notes (K)**. Leave the status columns (L–R) for the app and your day-to-day tracking.
+3. Update the term dates in **Settings → Clause 2 Term Schedule** so the invoices print the right period.
+
+**If you ever need a brand-new term tab** (e.g. a new academic year, `AY 27 T1`):
+
+1. Right-click any current term tab → **Move or Copy…** → tick **Create a copy** → OK.
+2. Rename the copy to the new term. The tab name becomes the PDF folder name, so name it sensibly and keep the `AY <yy> T<n>` shape (the app reads the term number from it).
+3. On the new tab, **clear columns I–R** (the term's own data and status). **Leave A–H alone** — they're formulas and keep working by themselves.
+4. Then follow steps 1–3 of the easy case above.
+
+Nothing is ever copied and pasted between sheets, so the columns cannot drift out of line. *(For the maintainer: `node scripts/add-term.js "<workbook>" "AY 27 T1"` creates a fresh, correctly-styled blank term tab in one command — it clones the layout, keeps A–H linked to Master, and blanks I–R. It appends after the existing tabs so the current term stays first.)*
 
 ### Closing a term — "freezing" it
 
@@ -370,6 +387,7 @@ Admins can ignore this section.
 - **Workbook shape:** tab 1 is `Master` (identity columns A–H, typed once). Every following tab is a term and pulls A–H with plain per-cell formulas `=IF(Master!A2="","",Master!A2)` down to row 500. Deliberately **not** IFERROR (a blank source is not an error — it evaluates to 0, which would show as zeros) and deliberately **no** dynamic-array/spill formulas (XLOOKUP/FILTER/Table[#Data]), which do not survive being written by script and reopened. Nothing is locked or protected — the owner preferred it that way; the formulas simply keep A–H in step with Master.
 - **Sheet selection:** billing always targets the first worksheet whose name is not `Master` (`activeTermSheet()` in `lib/parse-students.ts`). Falling back to sheet index 0 — as older versions did — bills from Master and silently produces invoices with lessons defaulted to 12, $0 material fees and nobody marked paid.
 - **Formula cells and cached values:** the app reads Excel's *cached* results, so a workbook whose formulas were written by a script must be opened and saved in Excel once before the app can read it. Day-to-day editing in Excel does this automatically. `lib/sheet-writeback.ts` resolves `{formula, result}` cells when matching serial numbers — reading the raw value yields NaN and would break write-back for every student.
+- **Adding a term tab:** `scripts/add-term.js <workbook> "AY 26 T2" ["AY 26 T4" …]` clones an existing term tab (default: the first non-Master tab, override with `--from "<tab>"`) into fresh blank term tabs — copying layout, column widths, per-child banding and header styling, keeping A–H linked to Master (formula **and** cached result, so the app reads names before Excel ever reopens it), and blanking columns I–R. It also resets each data cell's fill to the row's base banding colour, so no leftover red/green receipt shading carries over from the template. New tabs are appended after the existing ones so the current term stays first. The `AY 26 T2` and `AY 26 T4` tabs were created with it.
 - **Freezing a term:** `scripts/freeze-term.js <workbook> <tab>` converts A–H formulas to values (`--dry-run` supported). Refuses the Master tab, and aborts if no identity cell has a calculated value, since a formula that evaluates to blank is stored without a cached result and is otherwise indistinguishable from one Excel has never calculated.
 - **Receipt history:** the master spreadsheet is the source of truth — column **O** (Receipt Issued) and column **R** (Receipt Sent), written automatically on generate / Mark as Sent and parsed back on load. Receipt numbers are deterministic (`R-<TERMSLUG>-<serial padded to 3>`), so nothing needs to be looked up or carried between machines. A local **ledger** (`receipts-ledger.json`, alongside the config; serial numbers only, no names, by PDPA design) is kept as a **secondary cache** — it only matters when the spreadsheet was open in Excel and the write-back failed, in which case it is the only record of the issuance. Status is the union of the two sources, so a missing or wiped ledger degrades gracefully instead of causing silent duplicate receipts.
 - The app runs entirely on the local machine (localhost, random port); no data leaves the computer except files written to the Drive folder.

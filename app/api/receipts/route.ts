@@ -51,9 +51,14 @@ interface MarkSentBody {
   serialNo: number;
   term: string;
 }
+interface PreviewBody {
+  action: "preview";
+  student: Student;
+  term: string;
+}
 
 export async function POST(request: NextRequest) {
-  let body: GenerateBody | MarkSentBody;
+  let body: GenerateBody | MarkSentBody | PreviewBody;
   try {
     body = await request.json();
   } catch {
@@ -61,6 +66,41 @@ export async function POST(request: NextRequest) {
   }
 
   const config = getConfig();
+
+  // ── Preview a receipt (render only — never saves, no ledger, no writeback) ──
+  // Uses the same deterministic receipt number the real receipt would get, so
+  // the preview is faithful, but nothing is committed to disk or the sheet.
+  if (body.action === "preview") {
+    const s = body.student;
+    if (!s?.studentName || !s?.serialNo) {
+      return Response.json({ error: "Missing student data" }, { status: 400 });
+    }
+    try {
+      const buffer = await renderToBuffer(
+        createElement(ReceiptPDF, {
+          student: s,
+          logoBase64: getLogo(),
+          config,
+          receiptNo: receiptNo(body.term, s.serialNo),
+          term: body.term,
+          endDate: termEndDate(s, config, body.term),
+          paymentDate: s.dateOfReceipt || "",
+        }) as unknown as ReactElement<DocumentProps>
+      );
+      return new Response(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="Receipt_${safeFileName(s.studentName)}.pdf"`,
+          "Content-Length": String(buffer.length),
+        },
+      });
+    } catch (err) {
+      // PDPA: log serial numbers only
+      console.error(`Receipt preview failed for serial ${s.serialNo}:`, err instanceof Error ? err.message : "unknown");
+      return Response.json({ error: "Receipt preview failed — check server logs" }, { status: 500 });
+    }
+  }
+
   const ledger = readLedger();
 
   // ── Mark a receipt as sent (manual send by admin) ──

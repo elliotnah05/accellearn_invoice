@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { subjectsText, type Student, type ParseResult } from "@/types/student";
 import type { LedgerEntry } from "@/lib/billing-store";
@@ -29,6 +29,9 @@ export default function ReceiptsPage() {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [banner, setBanner]       = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
   const [confirmDup, setConfirmDup] = useState<{ student: Student; entry: LedgerEntry } | null>(null);
+  const [preview, setPreview]     = useState<{ url: string; name: string } | null>(null);
+  const [previewing, setPreviewing] = useState<Set<number>>(new Set());
+  const previewCache = useRef<Record<number, string>>({});
 
   useEffect(() => {
     loadLive();
@@ -141,6 +144,47 @@ export default function ReceiptsPage() {
     } finally {
       setRowBusy(student.serialNo, false);
     }
+  }
+
+  /** Render-only preview — never assigns a receipt number for real, never
+   *  writes a file or touches the sheet. Cached per student for the session. */
+  async function previewReceipt(student: Student) {
+    if (previewCache.current[student.serialNo]) {
+      setPreview({ url: previewCache.current[student.serialNo], name: student.studentName });
+      return;
+    }
+    setPreviewing((prev) => new Set(prev).add(student.serialNo));
+    try {
+      const res = await fetch("/api/receipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "preview", student, term: sheetName }),
+      });
+      if (!res.ok) {
+        setBanner({ kind: "warn", text: "Could not build receipt preview" });
+        return;
+      }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      previewCache.current[student.serialNo] = url;
+      setPreview({ url, name: student.studentName });
+    } catch {
+      setBanner({ kind: "warn", text: "Network error — is the dev server running?" });
+    } finally {
+      setPreviewing((prev) => {
+        const next = new Set(prev);
+        next.delete(student.serialNo);
+        return next;
+      });
+    }
+  }
+
+  function downloadFromPreview() {
+    if (!preview) return;
+    const a = document.createElement("a");
+    a.href = preview.url;
+    a.download = `Receipt_${preview.name.replace(/\s+/g, "_")}.pdf`;
+    a.click();
   }
 
   async function generateAllReady() {
@@ -287,7 +331,16 @@ export default function ReceiptsPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="w-56 flex justify-end gap-2 shrink-0">
+                  <div className="w-72 flex justify-end gap-2 shrink-0">
+                    <button
+                      onClick={() => previewReceipt(s)}
+                      disabled={previewing.has(s.serialNo)}
+                      className="text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-40"
+                      style={{ borderColor: "#AB33DA", color: "#AB33DA" }}
+                      title="See exactly what this receipt will look like — nothing is saved or issued"
+                    >
+                      {previewing.has(s.serialNo) ? "Loading…" : "Preview"}
+                    </button>
                     {st === "ready" && (
                       <button
                         onClick={() => generate(s)}
@@ -339,6 +392,47 @@ export default function ReceiptsPage() {
           <Link href="/" className="text-sm text-gray-400 hover:text-gray-600">↩ Return to Menu</Link>
         </div>
       </div>
+
+      {/* ── Receipt preview modal ── */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setPreview(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            style={{ width: "min(820px, 95vw)", height: "90vh" }}>
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200"
+              style={{ backgroundColor: "#AB33DA" }}>
+              <p className="text-white font-semibold text-sm">Receipt preview — {preview.name}</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={downloadFromPreview}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-white font-semibold transition-opacity hover:opacity-90"
+                  style={{ color: "#AB33DA" }}
+                >
+                  Download PDF
+                </button>
+                <button
+                  onClick={() => setPreview(null)}
+                  className="text-white opacity-70 hover:opacity-100 text-xl leading-none px-1"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* PDF iframe */}
+            <iframe
+              src={preview.url}
+              className="flex-1 w-full"
+              title={`Receipt preview for ${preview.name}`}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Duplicate confirmation modal ── */}
       {confirmDup && (

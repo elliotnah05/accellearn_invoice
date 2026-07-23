@@ -348,7 +348,7 @@ export default function ImportPage() {
                         Adjustment ($)<ResizeHandle onMouseDown={(e) => startResize(9, e)} />
                       </th>
                       <th className="relative select-none px-3 py-3 text-center font-semibold bg-purple-700">
-                        Adj Notes<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
+                        Adjustment Notes<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
                       </th>
                       {/* Calculated */}
                       <th className="relative select-none px-3 py-3 text-center font-semibold">
