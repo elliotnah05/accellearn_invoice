@@ -1,17 +1,25 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App name:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 23 July 2026 (v0.5.0 — Material removed, columns unlocked)
+**Last updated:** 23 July 2026 (v0.6.0 — 500 rows, colour-bleed fix)
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
 
 ---
 
-## 📌 Recent changes you should know about (v0.5.0)
+## 📌 Recent changes you should know about (v0.6.0)
+
+- **The sent/receipt colour now fills just the one cell.** Marking a receipt sent colours **only** the Receipt Issued cell (green), not the whole row as before. Generating colours only that cell red.
+- **Room for more students.** The linked rows now run to **row 500** (were 201), so you can keep adding people to Master for years without extending anything.
+- **The app and Excel no longer get in each other's way** — see the new note in section 4, "Do the app and Excel fight over the file?".
+
+---
+
+## 📌 Earlier changes (v0.5.0)
 
 - **The Material Fee column is gone.** Fees are now just the lesson fee plus any adjustment. Every child's total dropped by whatever material fee they used to have (e.g. a child who was $870 with a $30 material fee is now $840). The "Material Cost" line was also removed from the invoice's fee schedule.
 - **The columns after Lessons shifted one letter left** (because Material used to sit between them). The status columns are now **L–R**: Invoice Issued **L**, Paid **M**, Date of Receipt **N**, Receipt Issued **O**, Different End Date **P**, Backed Up **Q**, Receipt Sent **R**. Full table in section 4.
 - **A–H on the term tabs are no longer locked.** You can still just edit the Master tab as before and everything flows through — but nothing is protected anymore, so if you ever need to you *can* type directly on a term tab. (If you accidentally type over a linked cell, press Undo to bring the formula back.)
-- **The Receipt Issued cell is now a colour light.** When you generate a receipt it fills that cell **red** (issued, not yet sent); when you press **Mark as Sent** it turns **green**. One glance down the column shows what still needs sending.
+- **The Receipt Issued cell is a colour light.** When you generate a receipt it fills that one cell **red** (issued, not yet sent); when you press **Mark as Sent** it turns **green**. One glance down the column shows what still needs sending.
 - **Negative adjustments print with a minus sign** on the invoice — a −$40 discount now shows as `-$40.00` instead of `($40.00)`.
 
 ---
@@ -143,7 +151,7 @@ One row per **subject**. A child taking two subjects has two rows here, with A�
 | G | Duration (hrs) | `2` | Hours per lesson (blank = 2) |
 | H | Rate/hr ($) | `55` | Number only, no $ sign. **Required** — the app flags rows missing this |
 
-**To add a new student:** type them into the next free row on Master. They appear on the term tab immediately. Rows are linked down to **row 201**, so there is room for roughly 185 more rows before anything needs extending.
+**To add a new student:** type them into the next free row on Master. They appear on the term tab immediately. Rows are linked down to **row 500**, so there is room for hundreds more students before anything needs extending.
 
 ### The term tab — columns I–R
 
@@ -228,6 +236,15 @@ If you need to record chasing notes, part payments, or "parent says they'll pay 
 
 *(Why it works this way: different admins write "paid" a dozen different ways, so the app accepts all of them rather than forcing one spelling. The cost of that flexibility is that it can't tell a real payment from a note.)*
 
+### Do the app and Excel fight over the file?
+
+You can have the app open all the time — it only *reads* the spreadsheet. Two simple rules keep them in step:
+
+- **Made a change in Excel?** Save it (Ctrl+S), then click **⟳ Refresh** in the app (or reload the page). The app re-reads the file and shows your change. You do **not** need to close the app.
+- **About to generate a receipt or click Mark as Sent?** Those are the only times the app *writes* to the file. If the spreadsheet is open in Excel at that moment, Windows won't let the app write, so it shows a warning and the cell isn't updated. **Close the file in Excel first** (or close it and click the button again). The receipt PDF is still created either way.
+
+In short: editing in Excel and reading in the app can happen together; only the app's *write-back* (receipt number, sent date, red/green) needs Excel closed for that moment.
+
 ### Other rules
 
 - **Close the spreadsheet before generating receipts.** If the file is open in Excel, the receipt PDF still generates but the app can't write columns O/R — it will warn you, and you must fill in the cell by hand (or close Excel and re-generate).
@@ -270,7 +287,7 @@ When a term is finished and all its invoices and receipts have gone out, freeze 
 **How (in Excel, takes 10 seconds):**
 
 1. Go to the finished term's tab.
-2. Select **A2:H201**.
+2. Select **A2:H500**.
 3. **Copy** (Ctrl+C), then **Paste Special → Values** (right-click → Paste Options → the `123` icon).
 4. Save.
 
@@ -331,7 +348,7 @@ Clear columns **O** (Receipt Issued) and **R** (Receipt Sent) of any practice en
 | Duplicate receipt warning | You already issued this receipt. Proceeding re-issues with the **same** number and overwrites the same PDF — safe if you meant to re-issue. |
 | Invoice PDF missing an Adjustment line | The Adjustment line only prints when the amount in column K is not zero. A note in column L never prints on its own — column L is internal (see "Recent changes" above). |
 | Columns A–H on a term tab show a formula, not what I typed | Those columns are linked to the `Master` tab — make the change on **Master** and it updates here automatically (Section 4a). They're no longer locked, so if you typed over one and lost the link, press Undo. |
-| A student I added to Master isn't showing on the term tab | Check three things: they went on **Master** (not the term tab); their row is at or above **row 201**, where the links stop; and the file has been **saved**. If the row is below 201, copy the row above it down to extend the links. |
+| A student I added to Master isn't showing on the term tab | Check three things: they went on **Master** (not the term tab); their row is at or above **row 500**, where the links stop; and the file has been **saved**. If the row is below 500, copy the row above it down to extend the links. |
 | A term tab shows `0` where a name should be | The link lost its blank-check. Each cell should read `=IF(Master!B2="","",Master!B2)` — the `IF` is what turns an empty Master cell into a blank instead of a zero. |
 | An old term's fees changed by themselves | That term was never frozen, so it's still linked to Master and followed a rate change. Freeze finished terms — Section 4a, "Closing a term". |
 | The app is billing the wrong term | It always uses the **first tab after `Master`**. Drag the term you want to bill so it sits immediately after Master. |
@@ -350,7 +367,7 @@ Admins can ignore this section.
   Every past version stays archived under Releases, so you can roll back by downloading an older one. Local one-off builds still work: `npm run build` then `npm run dist` inside `app/`.
 - **Source code:** the `INVOICE ACCELLEARN` project folder (repo `accellearn_invoice`, scoped to `app/`). Next.js 16 + Electron.
 - **Per-machine app config** (folder paths, invoice template): `%APPDATA%\app\data\template.json` — but always prefer editing via the in-app Settings pages.
-- **Workbook shape:** tab 1 is `Master` (identity columns A–H, typed once). Every following tab is a term and pulls A–H with plain per-cell formulas `=IF(Master!A2="","",Master!A2)` down to row 201. Deliberately **not** IFERROR (a blank source is not an error — it evaluates to 0, which would show as zeros) and deliberately **no** dynamic-array/spill formulas (XLOOKUP/FILTER/Table[#Data]), which do not survive being written by script and reopened. Nothing is locked or protected — the owner preferred it that way; the formulas simply keep A–H in step with Master.
+- **Workbook shape:** tab 1 is `Master` (identity columns A–H, typed once). Every following tab is a term and pulls A–H with plain per-cell formulas `=IF(Master!A2="","",Master!A2)` down to row 500. Deliberately **not** IFERROR (a blank source is not an error — it evaluates to 0, which would show as zeros) and deliberately **no** dynamic-array/spill formulas (XLOOKUP/FILTER/Table[#Data]), which do not survive being written by script and reopened. Nothing is locked or protected — the owner preferred it that way; the formulas simply keep A–H in step with Master.
 - **Sheet selection:** billing always targets the first worksheet whose name is not `Master` (`activeTermSheet()` in `lib/parse-students.ts`). Falling back to sheet index 0 — as older versions did — bills from Master and silently produces invoices with lessons defaulted to 12, $0 material fees and nobody marked paid.
 - **Formula cells and cached values:** the app reads Excel's *cached* results, so a workbook whose formulas were written by a script must be opened and saved in Excel once before the app can read it. Day-to-day editing in Excel does this automatically. `lib/sheet-writeback.ts` resolves `{formula, result}` cells when matching serial numbers — reading the raw value yields NaN and would break write-back for every student.
 - **Freezing a term:** `scripts/freeze-term.js <workbook> <tab>` converts A–H formulas to values (`--dry-run` supported). Refuses the Master tab, and aborts if no identity cell has a calculated value, since a formula that evaluates to blank is stored without a cached result and is otherwise indistinguishable from one Excel has never calculated.

@@ -77,13 +77,20 @@ function findRowBySerial(ws: ExcelJS.Worksheet, serialNo: number): ExcelJS.Row |
 }
 
 function styleCell(cell: ExcelJS.Cell, fill?: ExcelJS.FillPattern): void {
-  cell.font = { name: "Calibri", size: 10 };
-  cell.alignment = { horizontal: "center", vertical: "middle" };
-  // Only the Receipt Issued status cell is deliberately filled (red/green — see
-  // the callers). Everywhere else we leave the fill untouched: the sheet is
-  // banded per CHILD, so guessing a fill from row parity would punch a
-  // mismatched colour into the middle of a band.
-  if (fill) cell.fill = fill;
+  // IMPORTANT: assign a fresh, independent style object rather than mutating
+  // cell.font / cell.fill directly. In an .xlsx, cells with identical formatting
+  // share one style record, and ExcelJS hands them the SAME in-memory style
+  // object — so `cell.fill = x` mutates every cell that shares it, painting the
+  // whole row (and beyond). Spreading the current style into a new object first
+  // breaks the share, so only THIS cell changes.
+  cell.style = {
+    ...cell.style,
+    font: { name: "Calibri", size: 10 },
+    alignment: { horizontal: "center", vertical: "middle" },
+    // Only the Receipt Issued status cell is deliberately filled (red/green —
+    // see the callers). Everywhere else the fill is left as-is.
+    ...(fill ? { fill } : {}),
+  };
 }
 
 function dmy(d = new Date()): string {
