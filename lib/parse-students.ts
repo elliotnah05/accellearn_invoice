@@ -16,16 +16,15 @@ const COL = {
   durationHrs:     6,   // G
   ratePerHour:     7,   // H
   lessons:         8,   // I
-  materialFee:     9,   // J
-  adjustment:      10,  // K  — one figure, may be negative
-  adjustmentNotes: 11,  // L  — internal only, never printed
-  invoiceIssued:   12,  // M
-  paid:            13,  // N
-  dateOfReceipt:   14,  // O
-  receiptIssued:   15,  // P
-  differentEndDate:16,  // Q
-  backedUp:        17,  // R
-  receiptSent:     18,  // S
+  adjustment:      9,   // J  — one figure, may be negative
+  adjustmentNotes: 10,  // K  — internal only, never printed
+  invoiceIssued:   11,  // L
+  paid:            12,  // M
+  dateOfReceipt:   13,  // N
+  receiptIssued:   14,  // O
+  differentEndDate:15,  // P
+  backedUp:        16,  // Q
+  receiptSent:     17,  // R
 } as const;
 
 type Row = (string | number | boolean | null | undefined)[];
@@ -99,7 +98,6 @@ export function parseWorkbook(buffer: Buffer): ParseResult {
       durationHrs:  numVal(row, COL.durationHrs) || 2,
       ratePerHour,
       lessons:      numVal(row, COL.lessons) || 12,
-      materialFee:     numVal(row, COL.materialFee),
       adjustment:      numVal(row, COL.adjustment),
       adjustmentNotes: cellVal(row, COL.adjustmentNotes),
       lessonFee: 0,
@@ -112,7 +110,7 @@ export function parseWorkbook(buffer: Buffer): ParseResult {
     return (
       cellVal(row, COL.subject) !== "" ||
       numVal(row, COL.ratePerHour) !== 0 ||
-      numVal(row, COL.materialFee) !== 0 ||
+      numVal(row, COL.adjustment) !== 0 ||
       numVal(row, COL.lessons) !== 0
     );
   }

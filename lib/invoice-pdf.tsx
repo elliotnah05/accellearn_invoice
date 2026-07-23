@@ -136,7 +136,10 @@ const S = StyleSheet.create({
 function fmtSGD(n: number): string {
   const abs = Math.abs(n);
   const str = `$${abs.toFixed(2)}`;
-  return n < 0 ? `(${str})` : str;
+  // Explicit minus sign for negatives (e.g. a −$40 discount prints "-$40.00"),
+  // so a reduced Adjustment reads clearly on the invoice rather than as
+  // accounting-style brackets.
+  return n < 0 ? `-${str}` : str;
 }
 
 function todayDMY(): string {
@@ -161,7 +164,6 @@ export function InvoicePDF({ student: s, logoBase64, config }: Props) {
   for (const line of s.subjects) {
     const tag = line.subject ? ` — ${line.subject}` : "";
     rows.push({ item: `Lesson Fee${tag}`, qty: String(line.lessons), total: fmtSGD(line.lessonFee) });
-    rows.push({ item: `Material Fee${tag}`, qty: "1", total: fmtSGD(line.materialFee) });
     if (line.adjustment !== 0) {
       rows.push({ item: `Adjustment${tag}`, qty: "-", total: fmtSGD(line.adjustment) });
     }

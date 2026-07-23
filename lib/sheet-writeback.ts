@@ -8,8 +8,14 @@ import { isMasterSheet } from "@/lib/parse-students";
 // (EBUSY) or not configured, we return a warning string instead of failing
 // the receipt generation.
 
-const COL_RECEIPT_ISSUED = 16; // P
-const COL_RECEIPT_SENT   = 19; // S
+const COL_RECEIPT_ISSUED = 15; // O
+const COL_RECEIPT_SENT   = 18; // R
+
+// The Receipt Issued cell doubles as an at-a-glance status light: red once a
+// receipt is generated (issued but not yet sent to the parent), green once the
+// admin marks it sent. Excel's standard "bad"/"good" fills, readable with black text.
+const FILL_ISSUED_NOT_SENT = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } } as const; // red
+const FILL_SENT            = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC6EFCE" } } as const; // green
 
 export interface WritebackResult {
   ok: boolean;
@@ -70,12 +76,14 @@ function findRowBySerial(ws: ExcelJS.Worksheet, serialNo: number): ExcelJS.Row |
   return null;
 }
 
-function styleCell(cell: ExcelJS.Cell): void {
+function styleCell(cell: ExcelJS.Cell, fill?: ExcelJS.FillPattern): void {
   cell.font = { name: "Calibri", size: 10 };
   cell.alignment = { horizontal: "center", vertical: "middle" };
-  // Deliberately does NOT set the fill. The sheet is banded per CHILD (a
-  // multi-subject child's rows share one colour), so guessing a fill from row
-  // parity here would punch a mismatched cell into the middle of a band.
+  // Only the Receipt Issued status cell is deliberately filled (red/green — see
+  // the callers). Everywhere else we leave the fill untouched: the sheet is
+  // banded per CHILD, so guessing a fill from row parity would punch a
+  // mismatched colour into the middle of a band.
+  if (fill) cell.fill = fill;
 }
 
 function dmy(d = new Date()): string {
@@ -90,7 +98,8 @@ export function writebackReceiptIssued(
     if (!row) throw new Error(`Serial ${serialNo} not found in sheet`);
     const cell = row.getCell(COL_RECEIPT_ISSUED);
     cell.value = `${receiptNo} · ${dmy()}`;
-    styleCell(cell);
+    // Issued but not yet sent → red status light.
+    styleCell(cell, FILL_ISSUED_NOT_SENT);
   });
 }
 
@@ -100,8 +109,11 @@ export function writebackReceiptSent(
   return withSheet(config, term, (ws) => {
     const row = findRowBySerial(ws, serialNo);
     if (!row) throw new Error(`Serial ${serialNo} not found in sheet`);
-    const cell = row.getCell(COL_RECEIPT_SENT);
-    cell.value = `Sent ${dmy()}`;
-    styleCell(cell);
+    // Record the send date in the Receipt Sent column …
+    const sentCell = row.getCell(COL_RECEIPT_SENT);
+    sentCell.value = `Sent ${dmy()}`;
+    styleCell(sentCell);
+    // … and flip the Receipt Issued status light from red to green.
+    styleCell(row.getCell(COL_RECEIPT_ISSUED), FILL_SENT);
   });
 }

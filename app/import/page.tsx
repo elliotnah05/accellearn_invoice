@@ -28,9 +28,8 @@ const COLUMNS = [
   { key: "rate",           width: 70,  min: 50  },
   { key: "duration",       width: 70,  min: 50  },
   { key: "lessons",        width: 70,  min: 50  },
-  { key: "material",       width: 80,  min: 60  },
   { key: "adjustment",     width: 90,  min: 60  },
-  { key: "adjustmentNotes", width: 200, min: 90  },
+  { key: "adjustmentNotes", width: 190, min: 120 },
   { key: "subtotal",       width: 90,  min: 60  },
   { key: "childTotal",     width: 100, min: 70  },
 ] as const;
@@ -309,7 +308,7 @@ export default function ImportPage() {
             {/* Preview / edit table */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="text-sm" style={{ tableLayout: "fixed", width: colWidths.reduce((a, b) => a + b, 0) }}>
+                <table className="text-sm" style={{ tableLayout: "fixed", width: "100%", minWidth: colWidths.reduce((a, b) => a + b, 0) }}>
                   <colgroup>
                     {COLUMNS.map((c, i) => (
                       <col key={c.key} style={{ width: colWidths[i] }} />
@@ -317,16 +316,16 @@ export default function ImportPage() {
                   </colgroup>
                   <thead>
                     <tr style={{ backgroundColor: "#AB33DA" }} className="text-white text-xs uppercase tracking-wide">
-                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
                         #<ResizeHandle onMouseDown={(e) => startResize(0, e)} />
                       </th>
-                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
                         Student<ResizeHandle onMouseDown={(e) => startResize(1, e)} />
                       </th>
-                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
                         Parent<ResizeHandle onMouseDown={(e) => startResize(2, e)} />
                       </th>
-                      <th className="relative select-none px-3 py-3 text-left font-semibold">
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
                         POC<ResizeHandle onMouseDown={(e) => startResize(3, e)} />
                       </th>
                       <th className="relative select-none px-3 py-3 text-center font-semibold">
@@ -346,20 +345,17 @@ export default function ImportPage() {
                         Lessons<ResizeHandle onMouseDown={(e) => startResize(8, e)} />
                       </th>
                       <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
-                        Material<ResizeHandle onMouseDown={(e) => startResize(9, e)} />
+                        Adjustment ($)<ResizeHandle onMouseDown={(e) => startResize(9, e)} />
                       </th>
-                      <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
-                        Adjustment ($)<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
-                      </th>
-                      <th className="relative select-none px-3 py-3 text-left font-semibold bg-purple-700">
-                        Adj Notes<ResizeHandle onMouseDown={(e) => startResize(11, e)} />
+                      <th className="relative select-none px-3 py-3 text-center font-semibold bg-purple-700">
+                        Adj Notes<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
                       </th>
                       {/* Calculated */}
-                      <th className="relative select-none px-3 py-3 text-right font-semibold">
-                        Subtotal<ResizeHandle onMouseDown={(e) => startResize(12, e)} />
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
+                        Subtotal<ResizeHandle onMouseDown={(e) => startResize(11, e)} />
                       </th>
-                      <th className="relative select-none px-3 py-3 text-right font-semibold">
-                        Child Total<ResizeHandle onMouseDown={(e) => startResize(13, e)} />
+                      <th className="relative select-none px-3 py-3 text-center font-semibold">
+                        Child Total<ResizeHandle onMouseDown={(e) => startResize(12, e)} />
                       </th>
                     </tr>
                   </thead>
@@ -375,12 +371,12 @@ export default function ImportPage() {
                             edited ? "bg-yellow-50" : childIdx % 2 === 1 ? "bg-gray-50" : "bg-white"
                           } hover:bg-purple-50`}
                         >
-                          <td className="px-3 py-2 text-gray-400 text-xs overflow-hidden text-ellipsis">{isFirst ? child.serialNo : ""}</td>
-                          <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.studentName : undefined}>
-                            {isFirst ? child.studentName : <span className="text-gray-300 text-xs pl-2">↳ same child</span>}
+                          <td className="px-3 py-2 text-center text-gray-400 text-xs overflow-hidden text-ellipsis">{isFirst ? child.serialNo : ""}</td>
+                          <td className="px-3 py-2 text-center font-medium text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.studentName : undefined}>
+                            {isFirst ? child.studentName : <span className="text-gray-300 text-xs">↳ same child</span>}
                           </td>
-                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.parentName : undefined}>{isFirst ? child.parentName : ""}</td>
-                          <td className="px-3 py-2 text-gray-500 font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">{isFirst ? maskPoc(child.poc) : ""}</td>
+                          <td className="px-3 py-2 text-center text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.parentName : undefined}>{isFirst ? child.parentName : ""}</td>
+                          <td className="px-3 py-2 text-center text-gray-500 font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">{isFirst ? maskPoc(child.poc) : ""}</td>
                           <td className="px-3 py-2 text-center">
                             {isFirst && (
                               <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: "#EDE9F7", color: "#7B2FBE" }}>
@@ -418,32 +414,28 @@ export default function ImportPage() {
                           </td>
                           <td className="px-2 py-1 bg-purple-50">
                             <input
-                              type="number" value={line.materialFee} min={0} step={1}
-                              onChange={(e) => updateLine(childIdx, subjIdx, { materialFee: Number(e.target.value) })}
-                              className={inputCls + " w-14"} title="Material fee"
-                            />
-                          </td>
-                          <td className="px-2 py-1 bg-purple-50">
-                            <input
                               type="number" value={line.adjustment} step={1}
                               onChange={(e) => updateLine(childIdx, subjIdx, { adjustment: Number(e.target.value) })}
-                              className={inputCls + " w-16 " + (line.adjustment < 0 ? "text-red-500" : line.adjustment > 0 ? "text-green-600" : "")}
+                              className={inputCls + " w-16 text-center " + (line.adjustment < 0 ? "text-red-500" : line.adjustment > 0 ? "text-green-600" : "")}
                               title="Adjustment amount — type a minus sign to discount (e.g. -80 for missed lessons), or a plain number to add (e.g. 90 for an extra session). Printed on the invoice as a single Adjustment line."
                             />
                           </td>
                           <td className="px-2 py-1 bg-purple-50">
-                            <input
-                              type="text" value={line.adjustmentNotes}
+                            <textarea
+                              value={line.adjustmentNotes}
                               onChange={(e) => updateLine(childIdx, subjIdx, { adjustmentNotes: e.target.value })}
                               placeholder="e.g. 2hr → 1.5hr from Wk 5…"
-                              className="w-full bg-transparent border-b border-transparent focus:border-purple-400 focus:outline-none py-0.5 text-xs text-left text-gray-600 placeholder-gray-300"
+                              rows={1}
+                              ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }}
+                              onInput={(e) => { const el = e.currentTarget; el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }}
+                              className="w-full bg-transparent border-b border-transparent focus:border-purple-400 focus:outline-none py-0.5 text-xs text-center text-gray-600 placeholder-gray-300 resize-none break-words leading-snug overflow-hidden"
                               title="Your own reference only — never printed on the invoice or receipt."
                             />
                           </td>
 
                           {/* ── Calculated (read-only) ── */}
-                          <td className="px-3 py-2 text-right text-gray-700 font-medium">{fmtCurrency(line.subtotal)}</td>
-                          <td className="px-3 py-2 text-right font-bold" style={{ color: "#AB33DA" }}>
+                          <td className="px-3 py-2 text-center text-gray-700 font-medium">{fmtCurrency(line.subtotal)}</td>
+                          <td className="px-3 py-2 text-center font-bold" style={{ color: "#AB33DA" }}>
                             {isLast ? fmtCurrency(child.totalFee) : ""}
                           </td>
                         </tr>
@@ -452,8 +444,8 @@ export default function ImportPage() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-gray-200 bg-gray-50">
-                      <td colSpan={15} className="px-3 py-3 text-right font-semibold text-gray-700">Grand Total</td>
-                      <td className="px-3 py-3 text-right font-bold text-lg" style={{ color: "#AB33DA" }}>
+                      <td colSpan={12} className="px-3 py-3 text-right font-semibold text-gray-700">Grand Total</td>
+                      <td className="px-3 py-3 text-center font-bold text-lg" style={{ color: "#AB33DA" }}>
                         {fmtCurrency(grandTotal)}
                       </td>
                     </tr>

@@ -41,7 +41,6 @@
   ],
   "feeScheduleIntro": "The fees are as follows:",
   "feeScheduleLines": [
-    "Material Cost: $30/Term",
     "P3 and P4: $35/hour ($840 per term). Classes are 2 hours.",
     "P5 and P6: $40/hour ($960 per term). Classes are 2 hours.",
     "S1 and S2: $45/hour ($1080 per term). Classes are 2 hours.",
