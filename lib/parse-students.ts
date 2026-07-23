@@ -72,9 +72,26 @@ export function activeTermSheet(names: string[]): string {
   return names.find((n) => !isMasterSheet(n)) ?? names[0];
 }
 
-export function parseWorkbook(buffer: Buffer): ParseResult {
+/** Every term tab (all sheets except Master), in workbook/tab order. Falls back
+ *  to all sheet names for older single-sheet workbooks that have no Master.
+ *  This is what the term picker on the invoice/receipt pages lists — so as the
+ *  admin adds term tabs over time, they appear automatically. */
+export function listTermSheets(names: string[]): string[] {
+  const terms = names.filter((n) => !isMasterSheet(n));
+  return terms.length ? terms : names;
+}
+
+/** Parse one term tab. `requestedSheet` picks a specific tab (e.g. from the
+ *  term dropdown); it is only honoured when it's a real, non-Master tab —
+ *  otherwise we fall back to the active term. Master is never parsed for
+ *  billing (it has no fees). */
+export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseResult {
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
-  const sheetName = activeTermSheet(wb.SheetNames);
+  const termSheets = listTermSheets(wb.SheetNames);
+  const sheetName =
+    requestedSheet && termSheets.includes(requestedSheet)
+      ? requestedSheet
+      : activeTermSheet(wb.SheetNames);
   const ws = wb.Sheets[sheetName];
 
   const raw = XLSX.utils.sheet_to_json<Row>(ws, {
@@ -173,5 +190,6 @@ export function parseWorkbook(buffer: Buffer): ParseResult {
     sheetName,
     students: students.map(recalcStudent),
     errors,
+    sheetNames: termSheets,
   };
 }

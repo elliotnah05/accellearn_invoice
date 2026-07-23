@@ -4,8 +4,12 @@ import type { TemplateConfig } from "@/app/api/config/route";
 import { CONFIG_PATH } from "@/lib/paths";
 
 /** GET → parse the master spreadsheet live from the configured path.
- *  This is what lets the admin skip re-importing: edit Excel, save, refresh. */
-export async function GET() {
+ *  This is what lets the admin skip re-importing: edit Excel, save, refresh.
+ *  Optional `?sheet=<tab name>` bills a specific term tab; without it, the
+ *  active term (first tab after Master). The response always lists every term
+ *  tab in `sheetNames` so the UI can offer a picker. */
+export async function GET(request: Request) {
+  const requestedSheet = new URL(request.url).searchParams.get("sheet") ?? undefined;
   let config: TemplateConfig;
   try {
     config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
@@ -32,7 +36,7 @@ export async function GET() {
     if (statSync(file).size > MAX_BYTES) {
       return Response.json({ error: "Master spreadsheet is unexpectedly large (over 10 MB) — refusing to parse." }, { status: 413 });
     }
-    const result = parseWorkbook(readFileSync(file));
+    const result = parseWorkbook(readFileSync(file), requestedSheet);
     return Response.json({
       ...result,
       source: "master",

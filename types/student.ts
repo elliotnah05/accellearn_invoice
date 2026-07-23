@@ -39,6 +39,9 @@ export interface ParseResult {
   sheetName: string;
   students: Student[];
   errors: string[];
+  /** Every term tab in the workbook (all sheets except Master), in tab order —
+   *  drives the term picker so it reflects whatever tabs currently exist. */
+  sheetNames: string[];
 }
 
 export function recalcLine(l: SubjectLine): SubjectLine {

@@ -22,6 +22,7 @@ type RowStatus = "unpaid" | "ready" | "generated" | "sent";
 export default function ReceiptsPage() {
   const [students, setStudents]   = useState<Student[]>([]);
   const [sheetName, setSheetName] = useState("");
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [entries, setEntries]     = useState<Record<number, LedgerEntry>>({});
   const [folderOk, setFolderOk]   = useState<boolean | null>(null);
   const [outputFolder, setOutputFolder] = useState<string>("");
@@ -38,14 +39,17 @@ export default function ReceiptsPage() {
   }, []);
 
   /** Preferred path: read the master sheet live (no re-importing). Falls back
-   *  to the last imported data in this browser session. */
-  async function loadLive() {
+   *  to the last imported data in this browser session. Pass a term tab name to
+   *  load a specific term; omit it for the active term (first tab after Master). */
+  async function loadLive(sheet?: string) {
     try {
-      const res = await fetch("/api/students");
+      const url = sheet ? `/api/students?sheet=${encodeURIComponent(sheet)}` : "/api/students";
+      const res = await fetch(url);
       if (res.ok) {
         const data = (await res.json()) as ParseResult;
         setStudents(data.students);
         setSheetName(data.sheetName);
+        setSheetNames(data.sheetNames ?? []);
         sessionStorage.setItem("accel_students", JSON.stringify(data.students));
         sessionStorage.setItem("accel_sheet", data.sheetName);
         refreshLedger(data.sheetName);
@@ -235,13 +239,26 @@ export default function ReceiptsPage() {
         <h1 className="text-white font-bold">Phase 4 — Generate Receipts</h1>
         <div className="ml-auto flex items-center gap-3">
           <button
-            onClick={loadLive}
+            onClick={() => loadLive(sheetName || undefined)}
             className="text-purple-100 hover:text-white text-sm border border-purple-300 rounded-lg px-3 py-1 transition-colors"
             title="Re-read the master spreadsheet for the latest payment statuses"
           >
             ⟳ Refresh
           </button>
-          <span className="text-purple-200 text-sm">{sheetName}</span>
+          {sheetNames.length > 0 ? (
+            <select
+              value={sheetName}
+              onChange={(e) => loadLive(e.target.value)}
+              title="Choose which term's receipts to work on. The list updates automatically as you add tabs to the workbook."
+              className="text-sm bg-white/15 text-white border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:border-white [&>option]:text-gray-800"
+            >
+              {sheetNames.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-purple-200 text-sm">{sheetName}</span>
+          )}
         </div>
       </header>
 

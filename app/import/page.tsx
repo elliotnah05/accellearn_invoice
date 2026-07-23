@@ -48,6 +48,7 @@ export default function ImportPage() {
   const [dragging, setDragging]         = useState(false);
   const [loading, setLoading]           = useState(false);
   const [sheetName, setSheetName]       = useState("");
+  const [sheetNames, setSheetNames]     = useState<string[]>([]);
   const [students, setStudents]         = useState<Student[]>([]);
   const [parseErrors, setParseErrors]   = useState<string[]>([]);
   const [hasData, setHasData]           = useState(false);
@@ -105,6 +106,7 @@ export default function ImportPage() {
 
   function applyResult(data: ParseResult, from: "upload" | "master") {
     setSheetName(data.sheetName);
+    setSheetNames(data.sheetNames ?? []);
     setStudents(data.students);
     setParseErrors(data.errors);
     setHasData(true);
@@ -112,11 +114,14 @@ export default function ImportPage() {
     setEditedCells(new Set());
   }
 
-  async function loadMaster() {
+  /** Load the master sheet. Pass a term tab name to bill a specific term;
+   *  omit it for the active term (first tab after Master). */
+  async function loadMaster(sheet?: string) {
     setError(null);
     setLoading(true);
     try {
-      const res  = await fetch("/api/students");
+      const url  = sheet ? `/api/students?sheet=${encodeURIComponent(sheet)}` : "/api/students";
+      const res  = await fetch(url);
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not load the master sheet"); return; }
       applyResult(data as ParseResult, "master");
@@ -195,7 +200,7 @@ export default function ImportPage() {
           <div className="max-w-2xl mx-auto flex flex-col gap-4">
             {masterAvailable && (
               <button
-                onClick={loadMaster}
+                onClick={() => loadMaster()}
                 disabled={loading}
                 className="w-full py-4 rounded-2xl text-white font-bold shadow transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: "#AB33DA" }}
@@ -247,8 +252,22 @@ export default function ImportPage() {
             {/* Summary bar */}
             <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Sheet</p>
-                <p className="font-bold text-gray-800">{sheetName}</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Term sheet</p>
+                {loadedFrom === "master" && sheetNames.length > 0 ? (
+                  <select
+                    value={sheetName}
+                    disabled={loading}
+                    onChange={(e) => loadMaster(e.target.value)}
+                    title="Choose which term tab to bill. The list updates automatically as you add tabs to the workbook."
+                    className="font-bold text-gray-800 bg-white border border-gray-200 rounded-lg px-2 py-1 mt-0.5 focus:outline-none focus:border-purple-400 disabled:opacity-50"
+                  >
+                    {sheetNames.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="font-bold text-gray-800">{sheetName}</p>
+                )}
               </div>
               <div className="text-center">
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Students</p>
@@ -272,7 +291,7 @@ export default function ImportPage() {
               <div className="flex gap-2">
                 {masterAvailable && (
                   <button
-                    onClick={loadMaster}
+                    onClick={() => loadMaster(sheetName || undefined)}
                     disabled={loading}
                     className="px-4 py-2 text-sm text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 disabled:opacity-50"
                   >

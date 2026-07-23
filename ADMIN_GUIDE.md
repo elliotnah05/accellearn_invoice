@@ -1,12 +1,20 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App name:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 23 July 2026 (v0.7.0 — receipt preview, all term tabs ready)
+**Last updated:** 23 July 2026 (v0.8.0 — pick which term tab to bill)
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
 
 ---
 
-## 📌 Recent changes you should know about (v0.7.0)
+## 📌 Recent changes you should know about (v0.8.0)
+
+- **You can now choose which term tab to work on — right in the app.** Both the **Import (Invoices)** page and the **Receipts** page now have a **Term sheet dropdown** listing every term tab in the workbook (everything except Master). Pick `AY 26 T2`, `AY 26 T3`, `AY 26 T4`, … and the app instantly loads that term's students, fees and receipt statuses.
+- **The list updates itself.** Add a new term tab in Excel (or with the maintainer script), click ⟳ Refresh / reload, and it appears in the dropdown automatically — nothing to configure.
+- **You no longer *have* to drag the current term to the front.** Dragging a tab to sit right after Master still sets the **default** term the app opens on, but the dropdown lets you bill or receipt **any** term without rearranging tabs. (Master is never listed — it holds no fees.)
+
+---
+
+## 📌 Earlier changes (v0.7.0)
 
 - **You can now preview a receipt before issuing it.** The Receipts page has a **Preview** button on every row — it opens the exact PDF the parent would get in a pop-up (with a Download button), just like the invoice preview. **Previewing changes nothing:** no file is saved, no receipt number is used up, and the spreadsheet is not touched. Only *Generate Receipt* commits anything. Use it to eye-check the amount and dates first.
 - **All four term tabs already exist in the workbook.** `student details LATEST.xlsx` now ships with **`AY 26 T2`, `AY 26 T3` and `AY 26 T4`** tabs. `T2` and `T4` are **blank and ready** — their A–H columns already link to Master; you just fill in Lessons/Adjustments/status when that term comes around. Starting one of those terms no longer means copying a tab — see section 4a.
@@ -98,14 +106,14 @@ The home page should show a green **"Connected — N students from …"** banner
 
 ### Invoices
 
-1. **Import Sheet** — click *Load Master Sheet* to pull the live spreadsheet (you can also drag-drop an Excel file, but normally you never need to). The table is editable: rate, duration, lessons, fees, adjustments. Edited rows turn yellow and totals recalculate live. ⚠️ **Edits you make in this table do NOT change the master spreadsheet.** They only affect the PDFs being generated right now — nothing is written back to Excel. If a change should be permanent (e.g. a new tuition timing/duration or rate), edit the **spreadsheet** itself, not just the app table. Drag a column header's right edge to widen/narrow it if you need to read a long note in full.
+1. **Import Sheet** — click *Load Master Sheet* to pull the live spreadsheet (you can also drag-drop an Excel file, but normally you never need to). Once loaded, a **Term sheet dropdown** appears at the top-left of the summary bar — switch it to bill a different term (`AY 26 T2`, `T3`, `T4`, …); the table reloads for that term. The table is editable: rate, duration, lessons, fees, adjustments. Edited rows turn yellow and totals recalculate live. ⚠️ **Edits you make in this table do NOT change the master spreadsheet.** They only affect the PDFs being generated right now — nothing is written back to Excel. If a change should be permanent (e.g. a new tuition timing/duration or rate), edit the **spreadsheet** itself, not just the app table. Drag a column header's right edge to widen/narrow it if you need to read a long note in full.
 2. **Generate Invoices** — creates a PDF per child. A child with multiple subjects gets **one** invoice with a line item per subject.
 3. **Review & Approve** — each row has *Preview* (opens the PDF in a pop-up so you can check it before it goes anywhere), then Approve ✓ or Flag ⚠ (a flagged row expands so you can type a note about what's wrong). *Approve All Pending* for bulk. The bar at the bottom keeps a live count of approved / flagged / pending and the total dollar amount.
 4. **Export** — approved invoices are written to the shared folder under **`Invoices\<term>\`** (e.g. `Invoices\AY 26 T3\`). Use the *Open folder* button, then send each PDF to the parent yourself.
 
 ### Receipts
 
-1. A child appears as **ready for a receipt** once their **Paid** column in the spreadsheet is filled in (see section 4).
+1. A child appears as **ready for a receipt** once their **Paid** column in the spreadsheet is filled in (see section 4). Use the **Term sheet dropdown** in the top-right of the header to switch which term's receipts you're working on — the list, dates and sent-status all reload for the chosen term.
 2. **Preview** (on every row) opens the receipt PDF in a pop-up so you can check the amount, dates and name before committing — **nothing is saved or issued**, and no receipt number is used. Optional, but handy for a quick sanity check.
 3. **Generate** writes the PDF to **`Receipts\<term>\`** and automatically writes back into the spreadsheet: column **O** (Receipt Issued) gets the receipt number and date, and the cell turns **red** (issued, not yet sent).
 4. **Mark as Sent** after you've sent it to the parent — ✅ **this DOES edit the master spreadsheet for you**, writing column **R** (Receipt Sent), e.g. `Sent 19/07/26`, and turning the Receipt Issued cell (column O) from red to **green**. (Generating the receipt in step 3 writes column O.) You don't have to fill these in by hand — unless the spreadsheet was open in Excel at the time, in which case the app can't write and warns you.
@@ -145,7 +153,7 @@ This is the most important section. The spreadsheet is the **single source of tr
 
 **The golden rule in one line:** *type student details on **Master**, type each term's billing on that **term's tab (columns I–R)**, and never touch A–H on a term tab — they mirror Master by formula.*
 
-⚠️ **The current term must be the first tab after Master.** That is how the app knows which term to bill. Right now that's **`AY 26 T3`**. When `AY 26 T4` becomes the live term, drag its tab so it sits immediately after Master. (`T2` and `T4` already exist but are blank — they only "go live" when you drag them to the front and start filling them in.)
+**Which term the app bills.** In the app, pick the term from the **Term sheet dropdown** (on both the Import and Receipts pages) — it lists every tab except Master. The **default** term the app opens on is the **first tab after Master**, so keeping the current term right after Master is still tidy, but you can bill or receipt any term from the dropdown without rearranging tabs. Right now the default is **`AY 26 T3`**. (`T2` and `T4` exist but are blank until you fill in their columns I–R.)
 
 ### The `Master` tab — columns A–H
 
@@ -282,7 +290,7 @@ That's it. They now appear on the current term tab automatically. Go to that tab
 
 **The easy case — the tab already exists.** `AY 26 T2`, `AY 26 T3` and `AY 26 T4` are all in the workbook already, with `T2` and `T4` sitting blank and ready. To start one of them:
 
-1. Drag its tab so it sits **immediately after `Master`**. The app always bills from the first tab after Master, so this is what makes it the live term.
+1. In the app, choose it from the **Term sheet dropdown** (Import / Receipts pages). Optionally drag its tab so it sits **immediately after `Master`** — that just makes it the term the app *opens on* by default; the dropdown can reach any term regardless.
 2. Its A–H columns are already linked to Master — **leave them alone**. Fill in **Lessons (I)** for the term, plus any **Adjustment (J)** and **Adjustment Notes (K)**. Leave the status columns (L–R) for the app and your day-to-day tracking.
 3. Update the term dates in **Settings → Clause 2 Term Schedule** so the invoices print the right period.
 
@@ -368,7 +376,7 @@ Clear columns **O** (Receipt Issued) and **R** (Receipt Sent) of any practice en
 | A student I added to Master isn't showing on the term tab | Check three things: they went on **Master** (not the term tab); their row is at or above **row 500**, where the links stop; and the file has been **saved**. If the row is below 500, copy the row above it down to extend the links. |
 | A term tab shows `0` where a name should be | The link lost its blank-check. Each cell should read `=IF(Master!B2="","",Master!B2)` — the `IF` is what turns an empty Master cell into a blank instead of a zero. |
 | An old term's fees changed by themselves | That term was never frozen, so it's still linked to Master and followed a rate change. Freeze finished terms — Section 4a, "Closing a term". |
-| The app is billing the wrong term | It always uses the **first tab after `Master`**. Drag the term you want to bill so it sits immediately after Master. |
+| The app is billing the wrong term | Pick the right one from the **Term sheet dropdown** (Import and Receipts pages). The dropdown's default is the first tab after Master — drag your current term there if you want it selected on open. |
 | A date shows as a number like `46216` in the app or on a receipt | You're running an outdated version of the app — install the current installer from the Drive folder. Current versions read Excel dates correctly. |
 
 ---
@@ -385,7 +393,7 @@ Admins can ignore this section.
 - **Source code:** the `INVOICE ACCELLEARN` project folder (repo `accellearn_invoice`, scoped to `app/`). Next.js 16 + Electron.
 - **Per-machine app config** (folder paths, invoice template): `%APPDATA%\app\data\template.json` — but always prefer editing via the in-app Settings pages.
 - **Workbook shape:** tab 1 is `Master` (identity columns A–H, typed once). Every following tab is a term and pulls A–H with plain per-cell formulas `=IF(Master!A2="","",Master!A2)` down to row 500. Deliberately **not** IFERROR (a blank source is not an error — it evaluates to 0, which would show as zeros) and deliberately **no** dynamic-array/spill formulas (XLOOKUP/FILTER/Table[#Data]), which do not survive being written by script and reopened. Nothing is locked or protected — the owner preferred it that way; the formulas simply keep A–H in step with Master.
-- **Sheet selection:** billing always targets the first worksheet whose name is not `Master` (`activeTermSheet()` in `lib/parse-students.ts`). Falling back to sheet index 0 — as older versions did — bills from Master and silently produces invoices with lessons defaulted to 12, $0 material fees and nobody marked paid.
+- **Sheet selection:** the app defaults to the first worksheet whose name is not `Master` (`activeTermSheet()` in `lib/parse-students.ts`), but the Import and Receipts pages expose a **term dropdown** built from `listTermSheets()` (every tab except Master, in tab order). The client passes the chosen tab as `GET /api/students?sheet=<name>`; `parseWorkbook(buffer, requestedSheet?)` only honours a real non-Master tab and otherwise falls back to the active term (so `?sheet=Master` or a bogus name can never bill Master, which would silently default lessons to 12 with nobody marked paid). The response always includes `sheetNames` so the dropdown reflects whatever tabs currently exist. Receipt reads/writes key off the selected term via the existing `?term=` param.
 - **Formula cells and cached values:** the app reads Excel's *cached* results, so a workbook whose formulas were written by a script must be opened and saved in Excel once before the app can read it. Day-to-day editing in Excel does this automatically. `lib/sheet-writeback.ts` resolves `{formula, result}` cells when matching serial numbers — reading the raw value yields NaN and would break write-back for every student.
 - **Adding a term tab:** `scripts/add-term.js <workbook> "AY 26 T2" ["AY 26 T4" …]` clones an existing term tab (default: the first non-Master tab, override with `--from "<tab>"`) into fresh blank term tabs — copying layout, column widths, per-child banding and header styling, keeping A–H linked to Master (formula **and** cached result, so the app reads names before Excel ever reopens it), and blanking columns I–R. It also resets each data cell's fill to the row's base banding colour, so no leftover red/green receipt shading carries over from the template. New tabs are appended after the existing ones so the current term stays first. The `AY 26 T2` and `AY 26 T4` tabs were created with it.
 - **Freezing a term:** `scripts/freeze-term.js <workbook> <tab>` converts A–H formulas to values (`--dry-run` supported). Refuses the Master tab, and aborts if no identity cell has a calculated value, since a formula that evaluates to blank is stored without a cached result and is otherwise indistinguishable from one Excel has never calculated.
