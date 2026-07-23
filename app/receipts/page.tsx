@@ -11,6 +11,12 @@ function fmtCurrency(n: number) {
   return `$${n.toFixed(2)}`;
 }
 
+/** dd/mm/yy — matches the date format sheet-writeback.ts stamps into the cells. */
+function dmyToday(): string {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
+}
+
 /** Admin conventions vary — treat any non-empty value that isn't "no"/"n" as paid. */
 function isPaid(s: Student): boolean {
   const v = s.paid.trim().toLowerCase();
@@ -23,7 +29,6 @@ export default function ReceiptsPage() {
   const [students, setStudents]   = useState<Student[]>([]);
   const [sheetName, setSheetName] = useState("");
   const [sheetNames, setSheetNames] = useState<string[]>([]);
-  const [entries, setEntries]     = useState<Record<number, LedgerEntry>>({});
   const [folderOk, setFolderOk]   = useState<boolean | null>(null);
   const [outputFolder, setOutputFolder] = useState<string>("");
   const [busy, setBusy]           = useState<Set<number>>(new Set());
@@ -52,7 +57,7 @@ export default function ReceiptsPage() {
         setSheetNames(data.sheetNames ?? []);
         sessionStorage.setItem("accel_students", JSON.stringify(data.students));
         sessionStorage.setItem("accel_sheet", data.sheetName);
-        refreshLedger(data.sheetName);
+        refreshFolderStatus(data.sheetName);
         return;
       }
     } catch { /* fall through to session data */ }
@@ -60,25 +65,31 @@ export default function ReceiptsPage() {
       const raw   = sessionStorage.getItem("accel_students");
       const sheet = sessionStorage.getItem("accel_sheet");
       if (raw)   setStudents(JSON.parse(raw));
-      if (sheet) { setSheetName(sheet); refreshLedger(sheet); }
+      if (sheet) { setSheetName(sheet); refreshFolderStatus(sheet); }
     } catch { /* sessionStorage unavailable */ }
   }
 
-  async function refreshLedger(term: string) {
+  async function refreshFolderStatus(term: string) {
     try {
       const res = await fetch(`/api/receipts?term=${encodeURIComponent(term)}`);
       const body = await res.json();
       setFolderOk(!!body.folderConfigured);
       if (body.outputFolder) setOutputFolder(body.outputFolder);
-      const map: Record<number, LedgerEntry> = {};
-      for (const e of body.entries as LedgerEntry[]) map[e.serialNo] = e;
-      setEntries(map);
     } catch { /* server down — leave as-is */ }
   }
 
-  /** Spreadsheet first (shared between all admins), local ledger as backup. */
+  /** The live spreadsheet is the single source of truth for receipt status — no
+   *  ledger here, so clearing a Receipt Issued/Sent cell in Excel and refreshing
+   *  undoes the status in the app, and marking it by hand in Excel shows up. */
   function stateFor(s: Student) {
-    return receiptState(s, entries[s.serialNo]);
+    return receiptState(s);
+  }
+
+  /** Reflect a just-completed write-back in the in-memory sheet data, so the row
+   *  updates instantly. The next live reload re-reads the real cells, keeping the
+   *  spreadsheet authoritative. Mirrors what sheet-writeback.ts writes. */
+  function patchStudent(serialNo: number, patch: Partial<Student>) {
+    setStudents((prev) => prev.map((s) => (s.serialNo === serialNo ? { ...s, ...patch } : s)));
   }
 
   function rowStatus(s: Student): RowStatus {
@@ -113,7 +124,9 @@ export default function ReceiptsPage() {
         setBanner({ kind: "warn", text: body.error ?? "Receipt generation failed" });
         return false;
       }
-      setEntries((prev) => ({ ...prev, [student.serialNo]: body.entry }));
+      // Mirror the Receipt Issued write-back into the in-memory sheet so the row
+      // flips to "generated" at once; the next reload re-syncs from the sheet.
+      patchStudent(student.serialNo, { receiptIssued: `${body.entry.receiptNo} · ${dmyToday()}` });
       setBanner(body.warning
         ? { kind: "warn", text: `Receipt ${body.entry.receiptNo} created, but: ${body.warning}` }
         : { kind: "ok", text: `Receipt ${body.entry.receiptNo} saved to the shared folder` });
@@ -139,7 +152,8 @@ export default function ReceiptsPage() {
         setBanner({ kind: "warn", text: body.error ?? "Could not mark as sent" });
         return;
       }
-      setEntries((prev) => ({ ...prev, [student.serialNo]: body.entry }));
+      // Mirror the Receipt Sent write-back so the row flips to "sent" at once.
+      patchStudent(student.serialNo, { receiptSent: `Sent ${dmyToday()}` });
       setBanner(body.warning
         ? { kind: "warn", text: `Marked as sent, but: ${body.warning}` }
         : { kind: "ok", text: `Marked as sent — Excel updated` });

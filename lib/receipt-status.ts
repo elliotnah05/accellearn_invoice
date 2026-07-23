@@ -2,12 +2,19 @@ import type { Student } from "@/types/student";
 
 // Reading receipt state back out of the master spreadsheet.
 //
-// The local ledger (lib/billing-store.ts) is only a cache on one machine. The
-// spreadsheet is the real record: generating a receipt stamps column R and
-// Mark as Sent stamps column U, and that file lives in the shared Drive folder,
-// so every admin's computer sees the same history. Parsing those columns back
-// is what lets a fresh install — a new admin, or the owner after handover —
-// still know a receipt was already issued and warn before re-issuing it.
+// The spreadsheet is the single source of truth. Generating a receipt stamps
+// column O (Receipt Issued) and Mark as Sent stamps column R (Receipt Sent),
+// and that file lives in the shared Drive folder, so every admin's computer sees
+// the same history. Parsing those columns back is what lets a fresh install — a
+// new admin, or the owner after handover — still know a receipt was issued.
+//
+// Because the sheet is authoritative, its BLANKS are meaningful too: if an admin
+// clears the Receipt Issued or Receipt Sent cell in Excel, the app reflects that
+// on the next refresh (the status is undone). The per-machine ledger
+// (lib/billing-store.ts) is only a last-resort backup used when the sheet is
+// completely silent for a child — e.g. a write-back that failed because the file
+// was open in Excel — and it is never allowed to revive a status the sheet no
+// longer shows.
 //
 // Pure functions only (no fs), so both the client page and the API route can
 // import this.
@@ -44,20 +51,43 @@ export function fmtIso(iso: string | null | undefined): string {
 }
 
 /**
- * What we know about this child's receipt, spreadsheet first, local ledger as
- * backup. The ledger still matters: if the spreadsheet was open in Excel the
- * write-back failed, and the ledger is the only place the issuance was recorded.
- * Returns null when no receipt exists in either source.
+ * What we know about this child's receipt.
+ *
+ * The spreadsheet is authoritative: whenever it holds ANY receipt info for this
+ * child (a Receipt Issued or Receipt Sent value), that is used verbatim and its
+ * blanks win — so clearing a cell in Excel undoes the status here on the next
+ * refresh, and marking sent by hand in Excel shows up as sent. The ledger is a
+ * pure fallback, consulted only when the sheet is completely silent for this
+ * child (e.g. a write-back that failed while the file was open in Excel); it is
+ * never allowed to revive a status the sheet no longer shows.
+ *
+ * Callers that want strict "sheet only" behaviour (the live receipts list)
+ * simply pass no ledgerEntry. Returns null when nothing is known.
  */
 export function receiptState(
   student: Student,
   ledgerEntry?: { receiptNo: string; issuedAt: string; sentAt: string | null }
 ): ReceiptState | null {
-  const sheet = parseIssuedCell(student.receiptIssued);
-  if (!sheet && !ledgerEntry) return null;
-  return {
-    receiptNo: sheet?.receiptNo || ledgerEntry?.receiptNo || "",
-    issued:    sheet?.date      || fmtIso(ledgerEntry?.issuedAt),
-    sent:      parseSentCell(student.receiptSent) || fmtIso(ledgerEntry?.sentAt),
-  };
+  const sheet     = parseIssuedCell(student.receiptIssued);
+  const sheetSent = parseSentCell(student.receiptSent);
+
+  // Sheet has something → it is the record, blanks included.
+  if (sheet || sheetSent) {
+    return {
+      receiptNo: sheet?.receiptNo || "",
+      issued:    sheet?.date || "",
+      sent:      sheetSent,
+    };
+  }
+
+  // Sheet is silent → last-resort ledger fallback (never overrides the sheet).
+  if (ledgerEntry && (ledgerEntry.issuedAt || ledgerEntry.sentAt)) {
+    return {
+      receiptNo: ledgerEntry.receiptNo,
+      issued:    fmtIso(ledgerEntry.issuedAt),
+      sent:      fmtIso(ledgerEntry.sentAt),
+    };
+  }
+
+  return null;
 }
