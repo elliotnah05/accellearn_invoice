@@ -19,6 +19,15 @@ function fmtCurrency(n: number) {
   return `$${n.toFixed(2)}`;
 }
 
+/** A student is part of this term's billing run only if there's something to
+ *  charge. No lessons and a $0 total means "not enrolled this term" — e.g. a
+ *  student added to Master ahead of a future term, with Lessons set to 0 on
+ *  this term's tab. Those are kept out of the run so they don't clutter it or
+ *  produce a $0 invoice. */
+function isBilledThisTerm(s: Student): boolean {
+  return s.totalFee > 0 || totalLessons(s) > 0;
+}
+
 const STATUS_CFG = {
   pending:  { label: "Pending",  bg: "bg-gray-100",    text: "text-gray-500",  dot: "bg-gray-400"   },
   approved: { label: "Approved", bg: "bg-green-50",    text: "text-green-700", dot: "bg-green-500"  },
@@ -118,11 +127,13 @@ export default function InvoicesPage() {
   }
 
   function approveAll() {
-    setRows((prev) => prev.map((r) => r.status !== "flagged" ? { ...r, status: "approved" } : r));
+    setRows((prev) => prev.map((r) =>
+      isBilledThisTerm(r.student) && r.status !== "flagged" ? { ...r, status: "approved" } : r
+    ));
   }
 
   async function exportToFolder() {
-    const approved = rows.filter((r) => r.status === "approved").map((r) => r.student);
+    const approved = rows.filter((r) => r.status === "approved" && isBilledThisTerm(r.student)).map((r) => r.student);
     if (approved.length === 0) return;
     setExporting(true);
     setExportMsg(null);
@@ -152,11 +163,16 @@ export default function InvoicesPage() {
     }
   }
 
-  const approvedCount = rows.filter((r) => r.status === "approved").length;
-  const flaggedCount  = rows.filter((r) => r.status === "flagged").length;
-  const pendingCount  = rows.filter((r) => r.status === "pending").length;
-  const grandTotal    = rows.reduce((s, r) => s + r.student.totalFee, 0);
-  const approvedTotal = rows.filter((r) => r.status === "approved").reduce((s, r) => s + r.student.totalFee, 0);
+  // Split out students not enrolled this term ($0, no lessons). Everything that
+  // drives the run — counts, totals, approve-all, export — looks only at the
+  // billed rows; the rest are shown in a muted "not billed this term" panel.
+  const billed        = rows.filter((r) => isBilledThisTerm(r.student));
+  const unbilled      = rows.filter((r) => !isBilledThisTerm(r.student));
+  const approvedCount = billed.filter((r) => r.status === "approved").length;
+  const flaggedCount  = billed.filter((r) => r.status === "flagged").length;
+  const pendingCount  = billed.filter((r) => r.status === "pending").length;
+  const grandTotal    = billed.reduce((s, r) => s + r.student.totalFee, 0);
+  const approvedTotal = billed.filter((r) => r.status === "approved").reduce((s, r) => s + r.student.totalFee, 0);
 
   if (rows.length === 0) {
     return (
@@ -188,7 +204,7 @@ export default function InvoicesPage() {
           {/* Stats bar */}
           <div className="grid grid-cols-5 gap-3">
             {[
-              { label: "Total Students", value: rows.length,             sub: null,                       hex: null,      cls: "text-gray-800"    },
+              { label: "Total Students", value: billed.length,           sub: unbilled.length > 0 ? `${unbilled.length} not billed this term` : null, hex: null, cls: "text-gray-800" },
               { label: "Pending",        value: pendingCount,            sub: null,                       hex: null,      cls: "text-gray-500"    },
               { label: "Approved",       value: approvedCount,           sub: fmtCurrency(approvedTotal), hex: null,      cls: "text-green-600"   },
               { label: "Flagged",        value: flaggedCount,            sub: "needs attention",           hex: null,      cls: "text-yellow-600"  },
@@ -230,6 +246,10 @@ export default function InvoicesPage() {
               </thead>
               <tbody>
                 {rows.map((row, i) => {
+                  // Not-enrolled-this-term students are shown in the panel below,
+                  // not in the billing table. `i` stays the real index so the
+                  // action buttons keep updating the right row.
+                  if (!isBilledThisTerm(row.student)) return null;
                   const cfg = STATUS_CFG[row.status];
                   return (
                     <Fragment key={row.student.serialNo}>
@@ -342,6 +362,33 @@ export default function InvoicesPage() {
               </tfoot>
             </table>
           </div>
+
+          {/* Not billed this term — students on Master with no lessons set for
+              this term (e.g. joining next term). Skipped from the run. */}
+          {unbilled.length > 0 && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <p className="text-sm font-semibold text-gray-600">
+                Not billed this term
+                <span className="ml-2 text-xs font-normal text-gray-400">({unbilled.length})</span>
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5 mb-3">
+                These students have no lessons set on <strong>{sheetName}</strong> (Lessons = 0), so there&apos;s nothing to
+                invoice — they&apos;re skipped. To include one, set their Lessons on this term&apos;s tab.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {unbilled.map((r) => (
+                  <span
+                    key={r.student.serialNo}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-500"
+                  >
+                    {r.student.studentName}
+                    <span className="text-gray-300"> · </span>
+                    {r.student.level}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       </main>

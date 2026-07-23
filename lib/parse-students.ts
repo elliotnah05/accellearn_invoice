@@ -42,6 +42,18 @@ function numVal(row: Row, idx: number): number {
   return isNaN(n) ? 0 : n;
 }
 
+/** Like numVal but returns `dflt` only for a genuinely BLANK cell. A typed `0`
+ *  stays 0. This matters for Lessons: a blank cell means "standard term, 12
+ *  lessons", but an explicit 0 means "not enrolled this term" (e.g. a student
+ *  added to Master for a future term) and must bill nothing — `numVal(...) || 12`
+ *  would wrongly turn that 0 back into 12. */
+function numValOr(row: Row, idx: number, dflt: number): number {
+  const v = row[idx];
+  if (v === null || v === undefined || v === "") return dflt;
+  const n = Number(v);
+  return isNaN(n) ? dflt : n;
+}
+
 /** Excel silently converts typed dates ("13/7/26") into date cells, which reach
  *  us as day serials (e.g. 46216) — and those would print verbatim on receipts.
  *  For the free-text status columns, turn plausible serials (2020–2064) back
@@ -112,9 +124,9 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     }
     return {
       subject:      cellVal(row, COL.subject),
-      durationHrs:  numVal(row, COL.durationHrs) || 2,
+      durationHrs:  numValOr(row, COL.durationHrs, 2),
       ratePerHour,
-      lessons:      numVal(row, COL.lessons) || 12,
+      lessons:      numValOr(row, COL.lessons, 12),
       adjustment:      numVal(row, COL.adjustment),
       adjustmentNotes: cellVal(row, COL.adjustmentNotes),
       lessonFee: 0,

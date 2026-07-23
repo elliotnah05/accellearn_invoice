@@ -1,12 +1,20 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App name:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 23 July 2026 (v0.8.0 — pick which term tab to bill)
+**Last updated:** 23 July 2026 (v0.9.0 — mid-term joiners / skip $0 students)
 **Who this is for:** The centre owner and any admin who runs billing. Keep this guide in the shared Google Drive folder and hand it to every new admin.
 
 ---
 
-## 📌 Recent changes you should know about (v0.8.0)
+## 📌 Recent changes you should know about (v0.9.0)
+
+- **Students not enrolled in a term are skipped from that term's invoices.** Set a student's **Lessons to `0`** on a term tab and the app now treats them as *not billed this term* — they don't appear in the invoice run, aren't counted, and never produce a $0 invoice. They're listed in a small grey **"Not billed this term"** panel under the review table so you can still see them. This is exactly how you handle someone who's on Master for a **future** term but isn't in the current one.
+- **`0` lessons finally means zero.** Previously a blank Lessons cell *and* a typed `0` both became 12 — so you couldn't actually zero someone out. Now: **blank = the standard 12**, but **`0` = zero lessons = not billed**. (Any other number bills that many lessons, e.g. `6` for a mid-term joiner.)
+- **Mid-term joiner, in one line:** add them to Master once, put the number of lessons they'll actually attend this term in the term tab (e.g. `6`), and leave next term at the full 12. See section 4a, "A student who joins or leaves mid-term".
+
+---
+
+## 📌 Earlier changes (v0.8.0)
 
 - **You can now choose which term tab to work on — right in the app.** Both the **Import (Invoices)** page and the **Receipts** page now have a **Term sheet dropdown** listing every term tab in the workbook (everything except Master). Pick `AY 26 T2`, `AY 26 T3`, `AY 26 T4`, … and the app instantly loads that term's students, fees and receipt statuses.
 - **The list updates itself.** Add a new term tab in Excel (or with the maintainer script), click ⟳ Refresh / reload, and it appears in the dropdown automatically — nothing to configure.
@@ -108,7 +116,7 @@ The home page should show a green **"Connected — N students from …"** banner
 
 1. **Import Sheet** — click *Load Master Sheet* to pull the live spreadsheet (you can also drag-drop an Excel file, but normally you never need to). Once loaded, a **Term sheet dropdown** appears at the top-left of the summary bar — switch it to bill a different term (`AY 26 T2`, `T3`, `T4`, …); the table reloads for that term. The table is editable: rate, duration, lessons, fees, adjustments. Edited rows turn yellow and totals recalculate live. ⚠️ **Edits you make in this table do NOT change the master spreadsheet.** They only affect the PDFs being generated right now — nothing is written back to Excel. If a change should be permanent (e.g. a new tuition timing/duration or rate), edit the **spreadsheet** itself, not just the app table. Drag a column header's right edge to widen/narrow it if you need to read a long note in full.
 2. **Generate Invoices** — creates a PDF per child. A child with multiple subjects gets **one** invoice with a line item per subject.
-3. **Review & Approve** — each row has *Preview* (opens the PDF in a pop-up so you can check it before it goes anywhere), then Approve ✓ or Flag ⚠ (a flagged row expands so you can type a note about what's wrong). *Approve All Pending* for bulk. The bar at the bottom keeps a live count of approved / flagged / pending and the total dollar amount.
+3. **Review & Approve** — each row has *Preview* (opens the PDF in a pop-up so you can check it before it goes anywhere), then Approve ✓ or Flag ⚠ (a flagged row expands so you can type a note about what's wrong). *Approve All Pending* for bulk. The bar at the bottom keeps a live count of approved / flagged / pending and the total dollar amount. Any student with **Lessons = 0** on this term's tab is treated as *not enrolled this term* — they're moved to a grey **"Not billed this term"** panel under the table and left out of the run (no invoice, not counted).
 4. **Export** — approved invoices are written to the shared folder under **`Invoices\<term>\`** (e.g. `Invoices\AY 26 T3\`). Use the *Open folder* button, then send each PDF to the parent yourself.
 
 ### Receipts
@@ -178,7 +186,7 @@ Columns A–H here are **formulas** showing what's on Master (edit them on Maste
 
 | Col | Field | What to type — with example | Notes |
 |-----|-------|------------------------------|-------|
-| I | Lessons | `12` | Number of lessons in the term (blank = 12) |
+| I | Lessons | `12` | Number of lessons in the term. **Blank = the standard 12.** A number bills that many (e.g. `6` for a mid-term joiner). **`0` = not enrolled this term** — the student is skipped from the invoice run entirely (no invoice, not counted) |
 | J | Adjustment ($) | `-80` or `90` | **One figure, plus or minus.** Minus reduces the bill (missed lessons, discount, shorter lessons); a plain number adds to it (extra session, assessment book). Prints on the invoice as a single "Adjustment" line for that subject. Leave blank or `0` if none |
 | K | Adjustment Notes | `2 lessons missed, not replaced` | **Your own reference only — never printed on the invoice or receipt.** Write whatever helps you remember why column J is what it is |
 | L | Invoice Issued | `1/7/26` (or `yes`) | Admin fills manually — your own tracking |
@@ -285,6 +293,16 @@ In short: editing in Excel and reading in the app can happen together; only the 
 4. Save.
 
 That's it. They now appear on the current term tab automatically. Go to that tab and fill in their **Lessons (I)** for this term.
+
+### A student who joins or leaves mid-term
+
+Because a student typed on **Master** appears on **every** term tab, the only thing you set per term is that term's **Lessons (I)**. That one number handles every "partial" case:
+
+- **Joins mid-term** — put the number of lessons they'll actually attend this term (e.g. `6` instead of 12). The bill pro-rates automatically (`Rate × Duration × 6`), and the invoice prints "6 lessons" so the parent sees exactly what they paid for. Use **Adjustment (J)** + a note in **K** for any joining discount or half-lesson tweak.
+- **Not in this term at all** (e.g. you've added them to Master ready for **next** term) — set this term's **Lessons to `0`**. They drop into the grey "Not billed this term" panel and are skipped from the run. On the next term's tab, leave Lessons blank (= 12) or type the real number, and they bill normally.
+- **Leaves partway** — set Lessons to how many they had before leaving; optionally record their last date in **Different End Date (P)** so the receipt shows the right term-end.
+
+You never delete or hide anyone — Master stays the full roster, and each term's Lessons column decides who is billed and for how much. Remember: **blank = 12**, `0` = not billed, any other number = that many lessons.
 
 ### Starting a new term
 
@@ -393,6 +411,7 @@ Admins can ignore this section.
 - **Source code:** the `INVOICE ACCELLEARN` project folder (repo `accellearn_invoice`, scoped to `app/`). Next.js 16 + Electron.
 - **Per-machine app config** (folder paths, invoice template): `%APPDATA%\app\data\template.json` — but always prefer editing via the in-app Settings pages.
 - **Workbook shape:** tab 1 is `Master` (identity columns A–H, typed once). Every following tab is a term and pulls A–H with plain per-cell formulas `=IF(Master!A2="","",Master!A2)` down to row 500. Deliberately **not** IFERROR (a blank source is not an error — it evaluates to 0, which would show as zeros) and deliberately **no** dynamic-array/spill formulas (XLOOKUP/FILTER/Table[#Data]), which do not survive being written by script and reopened. Nothing is locked or protected — the owner preferred it that way; the formulas simply keep A–H in step with Master.
+- **Zero-lesson / not-billed students:** `parseWorkbook` reads Lessons with `numValOr(row, col, 12)` — a genuinely blank cell defaults to 12, but a typed `0` stays 0 (the old `numVal(...) || 12` wrongly turned 0 back into 12, so a student could never be zeroed out). The invoice review page (`app/invoices/page.tsx`) treats a student with `totalFee === 0 && totalLessons === 0` as not enrolled this term (`isBilledThisTerm`) — excluded from counts, Approve-All, and export, and shown in a separate "Not billed this term" panel. A student with lessons but a $0 total (fully discounted) or a pure fee (0 lessons, positive adjustment) stays billable.
 - **Sheet selection:** the app defaults to the first worksheet whose name is not `Master` (`activeTermSheet()` in `lib/parse-students.ts`), but the Import and Receipts pages expose a **term dropdown** built from `listTermSheets()` (every tab except Master, in tab order). The client passes the chosen tab as `GET /api/students?sheet=<name>`; `parseWorkbook(buffer, requestedSheet?)` only honours a real non-Master tab and otherwise falls back to the active term (so `?sheet=Master` or a bogus name can never bill Master, which would silently default lessons to 12 with nobody marked paid). The response always includes `sheetNames` so the dropdown reflects whatever tabs currently exist. Receipt reads/writes key off the selected term via the existing `?term=` param.
 - **Formula cells and cached values:** the app reads Excel's *cached* results, so a workbook whose formulas were written by a script must be opened and saved in Excel once before the app can read it. Day-to-day editing in Excel does this automatically. `lib/sheet-writeback.ts` resolves `{formula, result}` cells when matching serial numbers — reading the raw value yields NaN and would break write-back for every student.
 - **Adding a term tab:** `scripts/add-term.js <workbook> "AY 26 T2" ["AY 26 T4" …]` clones an existing term tab (default: the first non-Master tab, override with `--from "<tab>"`) into fresh blank term tabs — copying layout, column widths, per-child banding and header styling, keeping A–H linked to Master (formula **and** cached result, so the app reads names before Excel ever reopens it), and blanking columns I–R. It also resets each data cell's fill to the row's base banding colour, so no leftover red/green receipt shading carries over from the template. New tabs are appended after the existing ones so the current term stays first. The `AY 26 T2` and `AY 26 T4` tabs were created with it.
