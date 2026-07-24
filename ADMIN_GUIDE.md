@@ -1,7 +1,7 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 24 July 2026 (v0.10.0)
+**Last updated:** 24 July 2026 (v0.10.1)
 **Who it's for:** The centre owner and any admin who runs billing. Keep this file in the shared Google Drive folder and hand it to every new admin. New to the app? Read sections 1–4 in order. A short version history is at the very end.
 
 ---
@@ -277,6 +277,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.10.1** — Internal bug-fix release (no admin-facing changes): config/ledger reads no longer crash on a UTF-8 BOM from hand-editing a JSON file in Notepad; fixed a broken local production build.
 - **v0.10.0** — Receipt status syncs **both ways** with Excel (edit/clear O or R and the app follows on refresh); write-back only ever touches the selected term tab.
 - **v0.9.0** — **Lessons = 0** marks a student "not billed this term" (skipped from the run); a typed `0` finally means zero (blank still = 12). Mid-term joiners handled by lesson count.
 - **v0.8.0** — **Term sheet dropdown** on the Invoices and Receipts pages; the list updates as you add tabs.

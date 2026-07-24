@@ -1,11 +1,11 @@
 import * as XLSX from "xlsx";
 import { recalcStudent, type ParseResult, type Student, type SubjectLine } from "@/types/student";
 
-// Column index map (0-based) matching "student details LATEST.xlsx" (A–S).
+// Column index map (0-based) matching "student details LATEST.xlsx" (A–R).
 // One row per SUBJECT; rows sharing a Serial No are one child → one invoice.
 // A–H are fixed forever (the template guarantees it); everything from I on is
-// the current billing layout. The old sheets had separate Material/Lesson
-// adjustment pairs in K–N, which pushed the status columns out to O–U.
+// the current billing layout. Older sheets had a separate Material Fee column
+// and split Material/Lesson adjustments, which pushed status further right.
 const COL = {
   serialNo:        0,   // A
   studentName:     1,   // B

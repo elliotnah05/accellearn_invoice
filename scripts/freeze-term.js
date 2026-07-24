@@ -15,7 +15,7 @@
  *   node scripts/freeze-term.js "<path to workbook>" "<term tab name>"
  *   node scripts/freeze-term.js "<path>" "AY 26 T3" --dry-run
  *
- * The equivalent by hand in Excel: select A2:H201 on the term tab, Copy, then
+ * The equivalent by hand in Excel: select A2:H500 on the term tab, Copy, then
  * Paste Special → Values.
  */
 const ExcelJS = require("exceljs");
