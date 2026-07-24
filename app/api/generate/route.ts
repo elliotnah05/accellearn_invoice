@@ -5,7 +5,7 @@ import { readFileSync } from "fs";
 import { InvoicePDF } from "@/lib/invoice-pdf";
 import type { Student } from "@/types/student";
 import type { TemplateConfig } from "@/app/api/config/route";
-import { CONFIG_PATH, LOGO_PATH } from "@/lib/paths";
+import { CONFIG_PATH, LOGO_PATH, readJson } from "@/lib/paths";
 
 let logoBase64: string;
 function getLogo(): string {
@@ -16,7 +16,7 @@ function getLogo(): string {
 }
 
 function getConfig(): TemplateConfig {
-  return JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  return readJson<TemplateConfig>(CONFIG_PATH);
 }
 
 export async function POST(request: NextRequest) {

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { readFileSync, writeFileSync } from "fs";
-import { CONFIG_PATH } from "@/lib/paths";
+import { writeFileSync } from "fs";
+import { CONFIG_PATH, readJson } from "@/lib/paths";
 
 export interface ScheduleRow {
   label: string;
@@ -23,7 +23,7 @@ export interface TemplateConfig {
 }
 
 function readConfig(): TemplateConfig {
-  return JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  return readJson<TemplateConfig>(CONFIG_PATH);
 }
 
 export async function GET() {

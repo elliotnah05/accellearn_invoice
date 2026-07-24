@@ -7,7 +7,7 @@ import { InvoicePDF } from "@/lib/invoice-pdf";
 import { ensureOutputDir, safeFileName, termSlug, outputFolderExists } from "@/lib/billing-store";
 import type { Student } from "@/types/student";
 import type { TemplateConfig } from "@/app/api/config/route";
-import { CONFIG_PATH, LOGO_PATH } from "@/lib/paths";
+import { CONFIG_PATH, LOGO_PATH, readJson } from "@/lib/paths";
 
 let logoBase64: string;
 function getLogo(): string {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "No students to export" }, { status: 400 });
   }
 
-  const config: TemplateConfig = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  const config: TemplateConfig = readJson<TemplateConfig>(CONFIG_PATH);
   if (!outputFolderExists(config)) {
     return Response.json(
       { error: "Output folder not set or doesn't exist — set it in Invoice Template → Folders." },

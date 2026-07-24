@@ -12,7 +12,7 @@ import { parseIssuedCell, parseSentCell } from "@/lib/receipt-status";
 import { writebackReceiptIssued, writebackReceiptSent } from "@/lib/sheet-writeback";
 import type { Student } from "@/types/student";
 import type { TemplateConfig } from "@/app/api/config/route";
-import { CONFIG_PATH, LOGO_PATH } from "@/lib/paths";
+import { CONFIG_PATH, LOGO_PATH, readJson } from "@/lib/paths";
 
 let logoBase64: string;
 function getLogo(): string {
@@ -23,7 +23,7 @@ function getLogo(): string {
 }
 
 function getConfig(): TemplateConfig {
-  return JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  return readJson<TemplateConfig>(CONFIG_PATH);
 }
 
 /** GET ?term=AY%2026%20T3 → ledger entries for that term + folder status. */

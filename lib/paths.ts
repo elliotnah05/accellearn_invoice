@@ -24,6 +24,17 @@ export const LOGO_PATH =
   process.env.ACCEL_LOGO_PATH || path.join(process.cwd(), "public", "logo.png");
 
 /**
+ * Reads + JSON.parses a file, stripping a leading UTF-8 BOM if present.
+ * Windows editors (Notepad's "Save As" default) write a BOM that
+ * `readFileSync(path, "utf8")` does NOT strip, which otherwise makes
+ * JSON.parse throw on an admin's hand-edited template.json/ledger.
+ */
+export function readJson<T>(filePath: string): T {
+  const raw = readFileSync(filePath, "utf8").replace(/^﻿/, "");
+  return JSON.parse(raw) as T;
+}
+
+/**
  * When ACCEL_DATA_DIR is set (packaged build), make sure the writable dir
  * exists and seed it once from the defaults shipped inside the bundle so the
  * app has a working template.json + ledger on first launch.

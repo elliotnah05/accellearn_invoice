@@ -123,20 +123,22 @@ export default function SettingsPage() {
     );
   }
 
-  const SaveBtn = ({ small }: { small?: boolean }) => (
-    <button
-      onClick={save}
-      disabled={saving}
-      className={`rounded-lg font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 ${
-        small
-          ? "px-5 py-2 text-sm bg-white"
-          : "px-6 py-2.5 text-sm text-white"
-      }`}
-      style={small ? { color: "#AB33DA" } : { backgroundColor: "#AB33DA" }}
-    >
-      {saving ? "Saving…" : "Save Changes"}
-    </button>
-  );
+  function saveBtn(small?: boolean) {
+    return (
+      <button
+        onClick={save}
+        disabled={saving}
+        className={`rounded-lg font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 ${
+          small
+            ? "px-5 py-2 text-sm bg-white"
+            : "px-6 py-2.5 text-sm text-white"
+        }`}
+        style={small ? { color: "#AB33DA" } : { backgroundColor: "#AB33DA" }}
+      >
+        {saving ? "Saving…" : "Save Changes"}
+      </button>
+    );
+  }
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -166,7 +168,7 @@ export default function SettingsPage() {
         <div className="w-px h-5 bg-purple-300 mx-1" />
         <h1 className="text-white font-bold">Invoice Template</h1>
         <div className="ml-auto flex items-center gap-3">
-          <SaveBtn small />
+          {saveBtn(true)}
         </div>
       </header>
 
@@ -336,7 +338,7 @@ export default function SettingsPage() {
 
             {/* ── Save bar ── */}
             <div className="flex justify-end pb-8">
-              <SaveBtn />
+              {saveBtn()}
             </div>
           </>
         )}

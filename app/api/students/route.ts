@@ -1,7 +1,7 @@
 import { readFileSync, statSync, existsSync } from "fs";
 import { parseWorkbook } from "@/lib/parse-students";
 import type { TemplateConfig } from "@/app/api/config/route";
-import { CONFIG_PATH } from "@/lib/paths";
+import { CONFIG_PATH, readJson } from "@/lib/paths";
 
 /** GET → parse the master spreadsheet live from the configured path.
  *  This is what lets the admin skip re-importing: edit Excel, save, refresh.
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const requestedSheet = new URL(request.url).searchParams.get("sheet") ?? undefined;
   let config: TemplateConfig;
   try {
-    config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+    config = readJson<TemplateConfig>(CONFIG_PATH);
   } catch {
     return Response.json({ error: "Could not read app config" }, { status: 500 });
   }

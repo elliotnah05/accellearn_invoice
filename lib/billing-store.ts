@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
 import path from "path";
 import type { TemplateConfig } from "@/app/api/config/route";
-import { LEDGER_PATH } from "@/lib/paths";
+import { LEDGER_PATH, readJson } from "@/lib/paths";
 
 // ── Receipt ledger ────────────────────────────────────────────────────────────
 // Stored in the app config dir (not the shared folder) so deleting/moving the
@@ -35,7 +35,7 @@ export function receiptNo(sheetName: string, serialNo: number): string {
 
 export function readLedger(): Ledger {
   try {
-    return JSON.parse(readFileSync(LEDGER_PATH, "utf8")) as Ledger;
+    return readJson<Ledger>(LEDGER_PATH);
   } catch {
     return {};
   }
