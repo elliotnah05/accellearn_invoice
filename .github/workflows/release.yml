@@ -22,8 +22,13 @@ jobs:
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
+      # Sequential, not parallel: both jobs publish to the same release, and
+      # softprops/action-gh-release creating it twice at once can race.
+      max-parallel: 1
       matrix:
         include:
           - os: windows-latest
@@ -47,24 +52,13 @@ jobs:
 
       - run: npx electron-builder --publish never
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: installer-${{ matrix.os }}
-          path: ${{ matrix.artifact }}
-          if-no-files-found: error
-
-  release:
-    name: Publish release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-          path: installers
-
+      # Uploads straight to the GitHub Release (not Actions artifact storage,
+      # which is a separate, much smaller quota that release installers — tens
+      # to hundreds of MB each, every tag — chew through fast). Each OS job
+      # calls this independently; action-gh-release appends to the same
+      # release rather than replacing it, so both files land on one release.
       - uses: softprops/action-gh-release@v2
         with:
-          files: installers/*
+          files: ${{ matrix.artifact }}
           generate_release_notes: true
           fail_on_unmatched_files: true
