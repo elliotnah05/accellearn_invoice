@@ -149,7 +149,8 @@ export default function InvoicesPage() {
       } else {
         setExportMsg(
           `✓ ${body.written} invoice PDF(s) saved to the shared folder` +
-          (body.failed?.length ? ` — ${body.failed.length} failed` : "")
+          (body.failed?.length ? ` — ${body.failed.length} failed` : "") +
+          (body.warning ? ` — ${body.warning}` : "")
         );
         setExportFolder(body.folder ?? null);
         // Carry data forward for the receipts phase
@@ -340,7 +341,7 @@ export default function InvoicesPage() {
                                 type="text"
                                 value={row.flagNote}
                                 onChange={(e) => setFlagNote(i, e.target.value)}
-                                placeholder="e.g. wrong adjustment, check lesson count…"
+                                placeholder="e.g. wrong material fee, check lesson count…"
                                 className="flex-1 text-xs border border-yellow-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-yellow-400"
                               />
                             </div>

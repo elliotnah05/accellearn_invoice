@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { InvoicePDF } from "@/lib/invoice-pdf";
 import { ensureOutputDir, safeFileName, termSlug, outputFolderExists } from "@/lib/billing-store";
+import { writebackInvoiceIssued } from "@/lib/sheet-writeback";
 import type { Student } from "@/types/student";
 import type { TemplateConfig } from "@/app/api/config/route";
 import { CONFIG_PATH, LOGO_PATH, readJson } from "@/lib/paths";
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
   const dir = ensureOutputDir(config, "Invoices", body.term)!;
   const slug = termSlug(body.term);
   const written: string[] = [];
+  const writtenSerials: number[] = [];
   const failed: number[] = [];
 
   for (const s of body.students) {
@@ -56,6 +58,7 @@ export async function POST(request: NextRequest) {
       const file = path.join(dir, `Invoice_${invNo}_${safeFileName(s.studentName)}.pdf`);
       writeFileSync(file, buffer);
       written.push(invNo);
+      writtenSerials.push(s.serialNo);
     } catch (err) {
       // PDPA: serial numbers only in logs
       console.error(`Invoice export failed for serial ${s.serialNo}:`, err instanceof Error ? err.message : "unknown");
@@ -63,5 +66,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return Response.json({ ok: failed.length === 0, written: written.length, failed, folder: dir });
+  // Stamp "Yes" into Invoice Issued for every student actually written. One
+  // workbook open/save for the whole batch — best-effort, so a spreadsheet
+  // that's open in Excel doesn't fail the export itself, just surfaces a warning.
+  let warning: string | null = null;
+  if (writtenSerials.length > 0) {
+    const wb = await writebackInvoiceIssued(config, body.term, writtenSerials);
+    warning = wb.warning ?? null;
+  }
+
+  return Response.json({ ok: failed.length === 0, written: written.length, failed, folder: dir, warning });
 }

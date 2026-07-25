@@ -8,6 +8,7 @@ import { isMasterSheet } from "@/lib/parse-students";
 // (EBUSY) or not configured, we return a warning string instead of failing
 // the receipt generation.
 
+const COL_INVOICE_ISSUED = 12; // L
 const COL_RECEIPT_ISSUED = 15; // O
 const COL_RECEIPT_SENT   = 18; // R
 
@@ -95,6 +96,25 @@ function styleCell(cell: ExcelJS.Cell, fill?: ExcelJS.FillPattern): void {
 
 function dmy(d = new Date()): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
+}
+
+/** Stamps "Yes" into Invoice Issued (column L) for every serial number in the
+ *  batch. One workbook open/save for the whole export run rather than one per
+ *  student — exports are always multi-student, unlike a single receipt. Plain
+ *  overwrite, so re-exporting the same student is idempotent (no duplicate
+ *  markers ever pile up in the cell). */
+export function writebackInvoiceIssued(
+  config: TemplateConfig, term: string, serialNos: number[]
+): Promise<WritebackResult> {
+  return withSheet(config, term, (ws) => {
+    for (const serialNo of serialNos) {
+      const row = findRowBySerial(ws, serialNo);
+      if (!row) continue; // shouldn't happen — the student came from this sheet
+      const cell = row.getCell(COL_INVOICE_ISSUED);
+      cell.value = "Yes";
+      styleCell(cell);
+    }
+  });
 }
 
 export function writebackReceiptIssued(

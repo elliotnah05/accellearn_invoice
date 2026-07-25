@@ -156,16 +156,16 @@ interface Props {
 
 export function InvoicePDF({ student: s, logoBase64, config }: Props) {
   // One invoice per child: a block of line items per subject.
-  // The Adjustment prints as a bare amount (negative = discount). Its NOTES
+  // The Material Fee prints as a bare amount (negative = discount). Its NOTES
   // column is the admin's internal record and must never reach the parent, so
-  // nothing is printed when the amount is zero — a $0 adjustment has nothing to
-  // say without its note.
+  // nothing is printed when the amount is zero — a $0 material fee has nothing
+  // to say without its note.
   const rows: { item: string; qty: string; total: string }[] = [];
   for (const line of s.subjects) {
     const tag = line.subject ? ` — ${line.subject}` : "";
     rows.push({ item: `Lesson Fee${tag}`, qty: String(line.lessons), total: fmtSGD(line.lessonFee) });
     if (line.adjustment !== 0) {
-      rows.push({ item: `Adjustment${tag}`, qty: "-", total: fmtSGD(line.adjustment) });
+      rows.push({ item: `Material Fee${tag}`, qty: "-", total: fmtSGD(line.adjustment) });
     }
   }
   const items = rows.map((r, i) => ({ no: `${i + 1}.`, ...r }));

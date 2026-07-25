@@ -52,7 +52,7 @@ Both the Invoices and Receipts pages have a **Term sheet dropdown** — it lists
 
 ### Invoices
 
-1. **Load Master Sheet** — pulls the live spreadsheet. Pick the term in the dropdown. The table is editable (rate, duration, lessons, adjustments); edited rows turn yellow and totals recalc live.
+1. **Load Master Sheet** — pulls the live spreadsheet. Pick the term in the dropdown. The table is editable (rate, duration, lessons, material fee); edited rows turn yellow and totals recalc live.
    ⚠️ **These edits do NOT change the spreadsheet** — they only affect the PDFs generated right now. For a permanent change (rate, duration), edit the **spreadsheet**.
 2. **Generate Invoices** — one PDF per child (a child with two subjects gets **one** invoice with a line per subject).
 3. **Review & Approve** — each row has **Preview** (see the exact PDF first), then **Approve ✓** or **Flag ⚠** (with a note). A student with **Lessons = 0** this term is treated as *not enrolled* and moved to a grey **"Not billed this term"** panel — no invoice, not counted.
@@ -91,7 +91,7 @@ The file is **`student details LATEST.xlsx`**. It has a **`Master`** tab and **o
 | Tab | Holds | You edit |
 |---|---|---|
 | **`Master`** (first tab) | Columns **A–H only** — details that stay the same term to term (name, parent, level, subject, rate) | The one and only place a student is typed in |
-| **Term tabs** (`AY 26 T2`, `T3`, `T4`, …) | **A–H auto-pulled from Master** + **I–R** for that term (lessons, adjustment, paid, receipts) | **I–R only** — A–H look after themselves |
+| **Term tabs** (`AY 26 T2`, `T3`, `T4`, …) | **A–H auto-pulled from Master** + **I–R** for that term (lessons, material fee, paid, receipts) | **I–R only** — A–H look after themselves |
 
 > **Golden rule:** type student details on **Master**; type each term's billing on that **term tab (I–R)**; never touch A–H on a term tab — they mirror Master by formula.
 
@@ -106,7 +106,7 @@ One row per **subject**. A child with two subjects has two rows, A–E merged ac
 | A | Serial No | `15` | **Unique per child.** Never reuse |
 | B | Student Name | `Jayden Tan` | Child's **first** row only |
 | C | Parent Name | `Mrs Tan` | Printed on invoice & receipt |
-| D | POC (WhatsApp) | `91234567` | Parent's contact |
+| D | School | `Raffles Institution` | Admin reference only — not printed anywhere, no logic reads it |
 | E | Level | `Sec 3` | Printed as the child's level |
 | F | Subject | `Mathematics` | One per row |
 | G | Duration (hrs) | `2` | Blank = 2 |
@@ -121,9 +121,9 @@ A–H are formulas from Master. Fill in I–R for the term:
 | Col | Field | Example | Notes |
 |---|---|---|---|
 | I | Lessons | `12` | **Blank = 12.** A number bills that many (`6` for a mid-term joiner). **`0` = not enrolled this term** (skipped from the run) |
-| J | Adjustment ($) | `-80` or `90` | One figure, ± . Minus discounts, plain number adds. Prints as one "Adjustment" line. Blank/`0` = none |
-| K | Adjustment Notes | `2 lessons missed` | **Internal only — never printed.** Your reminder of why J is what it is |
-| L | Invoice Issued | `1/7/26` | Your own manual tracking |
+| J | Material Fee ($) | `-80` or `90` | One figure, ± . Minus discounts, plain number adds. Prints as one "Material Fee" line. Blank/`0` = none |
+| K | Material Fee Notes | `2 lessons missed` | **Internal only — never printed.** Your reminder of why J is what it is |
+| L | Invoice Issued | *app writes* | `Yes` — stamped automatically the moment the app exports that child's invoice to the shared folder |
 | M | Paid | `yes` / `PayNow` / `13/7/26` | Anything except empty/no = paid — see **Paid rule** |
 | N | Date of Receipt | `13/7/26` | **Prints on the receipt** ("received a payment … on 13/07/26") |
 | O | Receipt Issued | *app writes* | `R-AY26T3-015 · 14/07/26`; red (issued) → green (sent). Clear it to cancel — see §8 |
@@ -135,7 +135,7 @@ A–H are formulas from Master. Fill in I–R for the term:
 
 ```
 Lesson Fee  = Rate/hr (H) × Duration (G) × Lessons (I)
-Subtotal    = Lesson Fee + Adjustment (J)      ← a negative Adjustment subtracts
+Subtotal    = Lesson Fee + Material Fee (J)      ← a negative Material Fee subtracts
 Grand Total = all of the child's subject Subtotals added up
 ```
 
@@ -144,10 +144,10 @@ Example — a two-subject child:
 | | Maths | Science |
 |---|---|---|
 | Rate × Duration × Lessons | $40 × 2 × 12 = **$960** | $40 × 1.5 × 12 = **$720** |
-| Adjustment (J) | **+$45** (book) | **−$75** (shorter lessons) |
+| Material Fee (J) | **+$45** (book) | **−$75** (shorter lessons) |
 | **Subtotal** | **$1,005** | **$645** |
 
-**Grand Total = $1,650.** The invoice shows a Lesson Fee + Adjustment line per subject; column K notes never appear. Negative adjustments print as `-$75.00`.
+**Grand Total = $1,650.** The invoice shows a Lesson Fee + Material Fee line per subject; column K notes never appear. Negative material fees print as `-$75.00`.
 
 ### Dates
 
@@ -191,11 +191,11 @@ So `yes`, `PayNow`, `13/7/26` all mean paid. ⚠️ **The trap:** words like `pe
 ## 5. Common tasks
 
 ### Add a new student (30 seconds)
-Master tab → next free row → Serial, Name, Parent, POC, Level, Subject, Duration, Rate → Save. Two subjects? Add a second row, leave the name blank, merge A–E. They appear on every term tab automatically — go to the term and set their **Lessons (I)**.
+Master tab → next free row → Serial, Name, Parent, School, Level, Subject, Duration, Rate → Save. Two subjects? Add a second row, leave the name blank, merge A–E. They appear on every term tab automatically — go to the term and set their **Lessons (I)**.
 
 ### A student who joins or leaves mid-term
 Master stays the full roster; each term's **Lessons (I)** decides who's billed and how much:
-- **Joins mid-term** → put the lessons they'll actually attend (e.g. `6`). The bill pro-rates and the invoice prints "6 lessons". Use **Adjustment (J)** for any joining discount.
+- **Joins mid-term** → put the lessons they'll actually attend (e.g. `6`). The bill pro-rates and the invoice prints "6 lessons". Use **Material Fee (J)** for any joining discount.
 - **Not in this term** (added ahead for next term) → set **Lessons = 0** → they drop into "Not billed this term". Next term, blank (= 12) or the real number.
 - **Leaves partway** → set Lessons to what they had; optionally set **Different End Date (P)** for the receipt.
 
@@ -204,7 +204,7 @@ Remember: **blank = 12, `0` = not billed, any number = that many.**
 ### Start a new term
 Most terms already exist as blank tabs. To start one:
 1. Pick it in the **Term sheet dropdown** (optionally drag its tab right after Master to make it the default).
-2. Leave A–H alone; fill in **Lessons (I)** (+ Adjustment) for each child.
+2. Leave A–H alone; fill in **Lessons (I)** (+ Material Fee) for each child.
 3. Update **Settings → Clause 2 Term Schedule** so invoices print the right dates.
 
 Need a brand-new tab (e.g. `AY 27 T1`)? Right-click a term tab → **Move or Copy → Create a copy**, rename it (keep the `AY <yy> T<n>` shape), **clear columns I–R**, then follow the steps above.
@@ -250,7 +250,8 @@ The spreadsheet and PDFs hold personal data of **minors** and their parents. Sin
 | Child shows "ready" but hasn't paid | Column M has a note like `pending`/`TBC` — the app counts any text as paid. Clear the cell (§4, Paid rule). |
 | Shows "Generated"/"Sent" you never did on this computer | Expected — another admin did it and the spreadsheet remembers. |
 | App shows outdated numbers | Save in Excel, then ⟳ Refresh (or reload the page). Check Drive has finished syncing. |
-| Invoice missing an Adjustment line | It only prints when **column J** isn't zero. The note in **column K** never prints (internal). |
+| Invoice missing a Material Fee line | It only prints when **column J** isn't zero. The note in **column K** never prints (internal). |
+| Invoice Issued (L) didn't get stamped | The app only writes it when you **Export to Folder** from the invoice review screen — previewing or downloading a single PDF doesn't touch the sheet. If it still shows blank after exporting, the sheet was probably open in Excel at that moment (check the banner on the export screen); close Excel and export again. |
 | A term tab shows a formula / `0` where a name should be | A–H are linked to Master — edit **Master**. A `0` means the link lost its blank-check; the cell should read `=IF(Master!B2="","",Master!B2)`. |
 | A student added to Master isn't on the term tab | Confirm it's on **Master**, at or above **row 500**, and the file is **saved**. Below row 500? Copy a row down to extend the links. |
 | An old term's fees changed by themselves | It was never frozen — freeze finished terms (§5). |
@@ -277,6 +278,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.11.0** — Column **D** relabelled **POC → School** (admin reference only, phone masking removed); **Adjustment (J/K) → Material Fee**, including the invoice PDF line item; **Invoice Issued (L)** is now stamped **"Yes"** automatically when invoices are exported to the shared folder (previously never written).
 - **v0.10.1** — Internal bug-fix release (no admin-facing changes): config/ledger reads no longer crash on a UTF-8 BOM from hand-editing a JSON file in Notepad; fixed a broken local production build.
 - **v0.10.0** — Receipt status syncs **both ways** with Excel (edit/clear O or R and the app follows on refresh); write-back only ever touches the selected term tab.
 - **v0.9.0** — **Lessons = 0** marks a student "not billed this term" (skipped from the run); a typed `0` finally means zero (blank still = 12). Mid-term joiners handled by lesson count.

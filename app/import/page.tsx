@@ -4,10 +4,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { recalcLine, type Student, type SubjectLine, type ParseResult } from "@/types/student";
 
-function maskPoc(poc: string): string {
-  return poc.replace(/(\d{2})(\d{3})(\d{4})$/, "$1XXX$3");
-}
-
 function fmtCurrency(n: number) {
   return `$${n.toFixed(2)}`;
 }
@@ -345,7 +341,7 @@ export default function ImportPage() {
                         Parent<ResizeHandle onMouseDown={(e) => startResize(2, e)} />
                       </th>
                       <th className="relative select-none px-3 py-3 text-center font-semibold">
-                        POC<ResizeHandle onMouseDown={(e) => startResize(3, e)} />
+                        School<ResizeHandle onMouseDown={(e) => startResize(3, e)} />
                       </th>
                       <th className="relative select-none px-3 py-3 text-center font-semibold">
                         Level<ResizeHandle onMouseDown={(e) => startResize(4, e)} />
@@ -364,10 +360,10 @@ export default function ImportPage() {
                         Lessons<ResizeHandle onMouseDown={(e) => startResize(8, e)} />
                       </th>
                       <th className="relative select-none px-2 py-3 text-center font-semibold bg-purple-700">
-                        Adjustment ($)<ResizeHandle onMouseDown={(e) => startResize(9, e)} />
+                        Material Fee ($)<ResizeHandle onMouseDown={(e) => startResize(9, e)} />
                       </th>
                       <th className="relative select-none px-3 py-3 text-center font-semibold bg-purple-700">
-                        Adjustment Notes<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
+                        Material Fee Notes<ResizeHandle onMouseDown={(e) => startResize(10, e)} />
                       </th>
                       {/* Calculated */}
                       <th className="relative select-none px-3 py-3 text-center font-semibold">
@@ -395,7 +391,7 @@ export default function ImportPage() {
                             {isFirst ? child.studentName : <span className="text-gray-300 text-xs">↳ same child</span>}
                           </td>
                           <td className="px-3 py-2 text-center text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.parentName : undefined}>{isFirst ? child.parentName : ""}</td>
-                          <td className="px-3 py-2 text-center text-gray-500 font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis">{isFirst ? maskPoc(child.poc) : ""}</td>
+                          <td className="px-3 py-2 text-center text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis" title={isFirst ? child.poc : undefined}>{isFirst ? child.poc : ""}</td>
                           <td className="px-3 py-2 text-center">
                             {isFirst && (
                               <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: "#EDE9F7", color: "#7B2FBE" }}>
@@ -436,7 +432,7 @@ export default function ImportPage() {
                               type="number" value={line.adjustment} step={1}
                               onChange={(e) => updateLine(childIdx, subjIdx, { adjustment: Number(e.target.value) })}
                               className={inputCls + " w-16 text-center " + (line.adjustment < 0 ? "text-red-500" : line.adjustment > 0 ? "text-green-600" : "")}
-                              title="Adjustment amount — type a minus sign to discount (e.g. -80 for missed lessons), or a plain number to add (e.g. 90 for an extra session). Printed on the invoice as a single Adjustment line."
+                              title="Material Fee amount — type a minus sign to discount (e.g. -80 for missed lessons), or a plain number to add (e.g. 90 for an extra session). Printed on the invoice as a single Material Fee line."
                             />
                           </td>
                           <td className="px-2 py-1 bg-purple-50">
