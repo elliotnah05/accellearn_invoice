@@ -123,7 +123,7 @@ A–H are formulas from Master. Fill in I–R for the term:
 | I | Lessons | `12` | **Blank = 12.** A number bills that many (`6` for a mid-term joiner). **`0` = not enrolled this term** (skipped from the run) |
 | J | Material Fee ($) | `-80` or `90` | One figure, ± . Minus discounts, plain number adds. Prints as one "Material Fee" line. Blank/`0` = none |
 | K | Material Fee Notes | `2 lessons missed` | **Internal only — never printed.** Your reminder of why J is what it is |
-| L | Invoice Issued | *app writes* | `Yes` — stamped automatically the moment the app exports that child's invoice to the shared folder |
+| L | Invoice Issued | *app writes* | `Yes` — stamped automatically the moment the app exports that child's invoice to the shared folder. **Two-way**, like Receipt Issued: clear the cell in Excel, save, and **⟳ Refresh** on the invoice review screen shows it as not-issued again |
 | M | Paid | `yes` / `PayNow` / `13/7/26` | Anything except empty/no = paid — see **Paid rule** |
 | N | Date of Receipt | `13/7/26` | **Prints on the receipt** ("received a payment … on 13/07/26") |
 | O | Receipt Issued | *app writes* | `R-AY26T3-015 · 14/07/26`; red (issued) → green (sent). Clear it to cancel — see §8 |
@@ -252,6 +252,7 @@ The spreadsheet and PDFs hold personal data of **minors** and their parents. Sin
 | App shows outdated numbers | Save in Excel, then ⟳ Refresh (or reload the page). Check Drive has finished syncing. |
 | Invoice missing a Material Fee line | It only prints when **column J** isn't zero. The note in **column K** never prints (internal). |
 | Invoice Issued (L) didn't get stamped | The app only writes it when you **Export to Folder** from the invoice review screen — previewing or downloading a single PDF doesn't touch the sheet. If it still shows blank after exporting, the sheet was probably open in Excel at that moment (check the banner on the export screen); close Excel and export again. |
+| Cleared Invoice Issued in Excel but the app still shows it issued | Save in Excel (Ctrl+S), then click **⟳ Refresh** on the invoice review screen — same as receipts, edits aren't visible until the file is saved and the app re-reads it. |
 | A term tab shows a formula / `0` where a name should be | A–H are linked to Master — edit **Master**. A `0` means the link lost its blank-check; the cell should read `=IF(Master!B2="","",Master!B2)`. |
 | A student added to Master isn't on the term tab | Confirm it's on **Master**, at or above **row 500**, and the file is **saved**. Below row 500? Copy a row down to extend the links. |
 | An old term's fees changed by themselves | It was never frozen — freeze finished terms (§5). |
@@ -278,6 +279,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.11.1** — Invoice Issued (column L) is now **two-way** with Excel, matching Receipt Issued: the invoice review screen reads it live and gained a **⟳ Refresh** button + an **Issued** status column, so clearing the cell in Excel and refreshing un-marks it in the app too (previously write-only).
 - **v0.11.0** — Column **D** relabelled **POC → School** (admin reference only, phone masking removed); **Adjustment (J/K) → Material Fee**, including the invoice PDF line item; **Invoice Issued (L)** is now stamped **"Yes"** automatically when invoices are exported to the shared folder (previously never written).
 - **v0.10.1** — Internal bug-fix release (no admin-facing changes): config/ledger reads no longer crash on a UTF-8 BOM from hand-editing a JSON file in Notepad; fixed a broken local production build.
 - **v0.10.0** — Receipt status syncs **both ways** with Excel (edit/clear O or R and the app follows on refresh); write-back only ever touches the selected term tab.

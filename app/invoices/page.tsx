@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Fragment } from "react";
 import Link from "next/link";
-import { subjectsText, totalLessons, type Student } from "@/types/student";
+import { subjectsText, totalLessons, type ParseResult, type Student } from "@/types/student";
 import { isDesktop, openFolder } from "@/lib/desktop";
 
 type ApprovalStatus = "pending" | "approved" | "flagged";
@@ -28,6 +28,16 @@ function isBilledThisTerm(s: Student): boolean {
   return s.totalFee > 0 || totalLessons(s) > 0;
 }
 
+/** The spreadsheet is authoritative for Invoice Issued (column L), same rule
+ *  as the Paid column: any non-empty value that isn't an explicit "no" counts
+ *  as issued. Covers the plain "Yes" the app itself stamps on export, plus
+ *  any older manual entries. Blank (including a cell cleared by hand in
+ *  Excel) means not issued — reflected here on the next live refresh. */
+function isInvoiceIssued(s: Student): boolean {
+  const v = s.invoiceIssued.trim().toLowerCase();
+  return v !== "" && v !== "no" && v !== "n" && v !== "false" && v !== "0";
+}
+
 const STATUS_CFG = {
   pending:  { label: "Pending",  bg: "bg-gray-100",    text: "text-gray-500",  dot: "bg-gray-400"   },
   approved: { label: "Approved", bg: "bg-green-50",    text: "text-green-700", dot: "bg-green-500"  },
@@ -37,29 +47,63 @@ const STATUS_CFG = {
 export default function InvoicesPage() {
   const [rows, setRows]           = useState<ReviewRow[]>([]);
   const [sheetName, setSheetName] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const [preview, setPreview]     = useState<{ url: string; name: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
   const [exportFolder, setExportFolder] = useState<string | null>(null);
   const urlCache = useRef<Record<number, string>>({});
 
-  useEffect(() => {
+  /** Apply freshly-loaded students, keeping each row's in-progress review
+   *  state (approved/flagged/preview) if that student was already on screen —
+   *  a refresh should pick up sheet changes like Invoice Issued being
+   *  cleared, not throw away work the admin already did this session. */
+  function applyStudents(students: Student[], sheet: string) {
+    setSheetName(sheet);
+    setRows((prev) => {
+      const prevByserial = new Map(prev.map((r) => [r.student.serialNo, r]));
+      return students.map((s) => {
+        const old = prevByserial.get(s.serialNo);
+        return old
+          ? { ...old, student: s }
+          : { student: s, status: "pending" as ApprovalStatus, flagNote: "", previewUrl: null, previewLoading: false };
+      });
+    });
+  }
+
+  /** Preferred path: read the master sheet live (no re-importing), so a
+   *  cleared Invoice Issued cell in Excel shows up here too. Falls back to
+   *  the last imported data in this browser session if the server can't be
+   *  reached. Pass a term tab name to reload that specific term. */
+  async function loadLive(sheet?: string) {
     try {
-      const raw   = sessionStorage.getItem("accel_students");
-      const sheet = sessionStorage.getItem("accel_sheet");
-      if (raw) {
-        const students: Student[] = JSON.parse(raw);
-        setRows(students.map((s) => ({
-          student: s,
-          status: "pending",
-          flagNote: "",
-          previewUrl: null,
-          previewLoading: false,
-        })));
+      const url = sheet ? `/api/students?sheet=${encodeURIComponent(sheet)}` : "/api/students";
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as ParseResult;
+        applyStudents(data.students, data.sheetName);
+        sessionStorage.setItem("accel_students", JSON.stringify(data.students));
+        sessionStorage.setItem("accel_sheet", data.sheetName);
+        return;
       }
-      if (sheet) setSheetName(sheet);
+    } catch { /* fall through to session data */ }
+    try {
+      const raw        = sessionStorage.getItem("accel_students");
+      const savedSheet = sessionStorage.getItem("accel_sheet");
+      if (raw) applyStudents(JSON.parse(raw), savedSheet ?? "");
     } catch { /* sessionStorage unavailable */ }
+  }
+
+  useEffect(() => {
+    let sheet: string | undefined;
+    try { sheet = sessionStorage.getItem("accel_sheet") ?? undefined; } catch { /* unavailable */ }
+    loadLive(sheet);
   }, []);
+
+  async function refresh() {
+    setRefreshing(true);
+    try { await loadLive(sheetName || undefined); } finally { setRefreshing(false); }
+  }
 
   async function generatePreview(idx: number) {
     const row = rows[idx];
@@ -153,6 +197,12 @@ export default function InvoicesPage() {
           (body.warning ? ` — ${body.warning}` : "")
         );
         setExportFolder(body.folder ?? null);
+        // Mirror the Invoice Issued write-back into the in-memory rows so the
+        // badge flips at once; the next refresh re-syncs from the sheet.
+        const exportedSerials = new Set(approved.map((s) => s.serialNo));
+        setRows((prev) => prev.map((r) =>
+          exportedSerials.has(r.student.serialNo) ? { ...r, student: { ...r.student, invoiceIssued: "Yes" } } : r
+        ));
         // Carry data forward for the receipts phase
         sessionStorage.setItem("accel_approved", JSON.stringify(approved));
         sessionStorage.setItem("accel_sheet", sheetName);
@@ -197,7 +247,17 @@ export default function InvoicesPage() {
           <Link href="/import" className="text-white opacity-70 hover:opacity-100 text-sm">← Back</Link>
           <div className="w-px h-5 bg-purple-300 mx-1" />
           <h1 className="text-white font-bold">Phase 3 — Review & Approve Invoices</h1>
-          <span className="ml-auto text-purple-200 text-sm">{sheetName}</span>
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              className="text-purple-100 hover:text-white text-sm border border-purple-300 rounded-lg px-3 py-1 transition-colors disabled:opacity-50"
+              title="Re-read the master spreadsheet — picks up Invoice Issued changes made directly in Excel"
+            >
+              {refreshing ? "Refreshing…" : "⟳ Refresh"}
+            </button>
+            <span className="text-purple-200 text-sm">{sheetName}</span>
+          </div>
         </header>
 
         <div className="flex-1 px-8 py-6 max-w-7xl mx-auto w-full flex flex-col gap-5">
@@ -241,6 +301,7 @@ export default function InvoicesPage() {
                   <th className="px-4 py-3 text-center font-semibold">Lessons</th>
                   <th className="px-4 py-3 text-right font-semibold">Total</th>
                   <th className="px-4 py-3 text-center font-semibold">Invoice</th>
+                  <th className="px-4 py-3 text-center font-semibold">Issued</th>
                   <th className="px-4 py-3 text-center font-semibold">Status</th>
                   <th className="px-4 py-3 text-center font-semibold">Actions</th>
                 </tr>
@@ -292,6 +353,17 @@ export default function InvoicesPage() {
                           </button>
                         </td>
 
+                        {/* Invoice Issued — reflects the sheet's column L live */}
+                        <td className="px-4 py-3 text-center">
+                          {isInvoiceIssued(row.student) ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              ✓ Issued
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </td>
+
                         {/* Status badge */}
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
@@ -334,7 +406,7 @@ export default function InvoicesPage() {
                       {/* Flag note row — inline expansion */}
                       {row.status === "flagged" && (
                         <tr className="bg-yellow-50/60 border-t border-yellow-100">
-                          <td colSpan={9} className="px-4 pb-3 pt-1">
+                          <td colSpan={10} className="px-4 pb-3 pt-1">
                             <div className="flex items-center gap-3 ml-6">
                               <span className="text-xs text-yellow-600 font-medium whitespace-nowrap">Flag reason:</span>
                               <input
@@ -358,7 +430,7 @@ export default function InvoicesPage() {
                   <td className="px-4 py-3 text-right font-bold text-lg" style={{ color: "#AB33DA" }}>
                     {fmtCurrency(grandTotal)}
                   </td>
-                  <td colSpan={3} />
+                  <td colSpan={4} />
                 </tr>
               </tfoot>
             </table>
