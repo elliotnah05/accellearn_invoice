@@ -1,7 +1,7 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 24 July 2026 (v0.10.1)
+**Last updated:** 26 July 2026 (v0.11.2)
 **Who it's for:** The centre owner and any admin who runs billing. Keep this file in the shared Google Drive folder and hand it to every new admin. New to the app? Read sections 1–4 in order. A short version history is at the very end.
 
 ---
@@ -71,7 +71,9 @@ Receipt numbers are automatic and fixed — `R-AY26T3-013` = term AY 26 T3, seri
 
 ### Status
 
-A read-only overview: who's invoiced / paid / has a receipt issued / sent, with count tiles.
+A read-only overview: who's invoiced / paid / has a receipt issued / sent, with count tiles. Every figure is read **from the spreadsheet**, so it matches what the Invoices and Receipts pages show and looks the same on every admin's computer.
+
+⚠️ Status always shows the **first term tab after Master** — it has no term dropdown. Keep the current term directly after Master (§4) and it will always show the term you're working on.
 
 ### Settings — the invoice template
 
@@ -176,7 +178,7 @@ So `yes`, `PayNow`, `13/7/26` all mean paid. ⚠️ **The trap:** words like `pe
 ### App vs Excel — who can have the file open
 
 - **Reading:** the app can stay open all the time — it only reads. After any Excel edit, **Save (Ctrl+S)** then click **⟳ Refresh** in the app. (The app reads the *saved* file — unsaved Excel changes are invisible to it.)
-- **Writing:** the app writes only when you **Generate a receipt** or **Mark as Sent**. If the file is open in Excel at that moment, the write is blocked and the app warns you — close Excel and click again. The PDF is still created.
+- **Writing:** the app writes on exactly three actions — **Export invoices** (stamps column L), **Generate a receipt** (column O), and **Mark as Sent** (columns R + O). If the file is open in Excel at that moment, the write is blocked and the app warns you — close Excel and do it again. The PDFs are still created either way.
 
 ### Other rules
 
@@ -229,7 +231,7 @@ The spreadsheet and PDFs hold personal data of **minors** and their parents. Sin
 
 **Off-boarding:** remove their Google account from the folder's sharing list; have them uninstall the app and confirm no local copies of the spreadsheet/PDFs remain.
 
-**Before handing over a spreadsheet used for testing:** clear columns **O** and **R** of any practice entries (leftover values make children look like they already have receipts). Leave column M (Paid) if you want the new admin to be able to try a receipt straight away.
+**Before handing over a spreadsheet used for testing:** clear columns **L**, **O** and **R** of any practice entries on every term tab (leftover values make children look like they were already invoiced or already have receipts). Also check the **current term tab sits directly after Master** — the app opens on the first tab after Master, so a finished term left in front means it opens on the wrong term. Leave column M (Paid) if you want the new admin to be able to try a receipt straight away.
 
 **On-boarding:** share the folder (Editor); send a **link**, not files (installers are large and already sit in `App Installer`); have them follow §2 (flag the "Shared with me" step); walk them through one full cycle and the merged-cell rule.
 
@@ -249,6 +251,7 @@ The spreadsheet and PDFs hold personal data of **minors** and their parents. Sin
 | Child not showing as ready for a receipt | Column M (Paid) is empty or says no/n. |
 | Child shows "ready" but hasn't paid | Column M has a note like `pending`/`TBC` — the app counts any text as paid. Clear the cell (§4, Paid rule). |
 | Shows "Generated"/"Sent" you never did on this computer | Expected — another admin did it and the spreadsheet remembers. |
+| Status page shows a different term than the one I'm billing | Status has no term dropdown — it always reads the **first tab after Master**. Drag the current term tab to sit directly after Master. |
 | App shows outdated numbers | Save in Excel, then ⟳ Refresh (or reload the page). Check Drive has finished syncing. |
 | Invoice missing a Material Fee line | It only prints when **column J** isn't zero. The note in **column K** never prints (internal). |
 | Invoice Issued (L) didn't get stamped | The app only writes it when you **Export to Folder** from the invoice review screen — previewing or downloading a single PDF doesn't touch the sheet. If it still shows blank after exporting, the sheet was probably open in Excel at that moment (check the banner on the export screen); close Excel and export again. |
@@ -279,6 +282,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.11.2** — **Status page now reads everything from the spreadsheet** (it previously read receipts from a file stored on your own computer, so a new admin's Status page showed zero receipts while the Receipts page correctly showed them). Added an **Invoices issued** tile and column.
 - **v0.11.1** — Invoice Issued (column L) is now **two-way** with Excel, matching Receipt Issued: the invoice review screen reads it live and gained a **⟳ Refresh** button + an **Issued** status column, so clearing the cell in Excel and refreshing un-marks it in the app too (previously write-only).
 - **v0.11.0** — Column **D** relabelled **POC → School** (admin reference only, phone masking removed); **Adjustment (J/K) → Material Fee**, including the invoice PDF line item; **Invoice Issued (L)** is now stamped **"Yes"** automatically when invoices are exported to the shared folder (previously never written).
 - **v0.10.1** — Internal bug-fix release (no admin-facing changes): config/ledger reads no longer crash on a UTF-8 BOM from hand-editing a JSON file in Notepad; fixed a broken local production build.

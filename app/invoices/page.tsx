@@ -74,10 +74,16 @@ export default function InvoicesPage() {
   /** Preferred path: read the master sheet live (no re-importing), so a
    *  cleared Invoice Issued cell in Excel shows up here too. Falls back to
    *  the last imported data in this browser session if the server can't be
-   *  reached. Pass a term tab name to reload that specific term. */
+   *  reached. Pass a term tab name to reload that specific term; omit it to
+   *  reuse the term chosen on the import page (kept in sessionStorage), so
+   *  arriving here keeps billing the term the admin actually picked. */
   async function loadLive(sheet?: string) {
+    let term = sheet;
+    if (!term) {
+      try { term = sessionStorage.getItem("accel_sheet") ?? undefined; } catch { /* unavailable */ }
+    }
     try {
-      const url = sheet ? `/api/students?sheet=${encodeURIComponent(sheet)}` : "/api/students";
+      const url = term ? `/api/students?sheet=${encodeURIComponent(term)}` : "/api/students";
       const res = await fetch(url);
       if (res.ok) {
         const data = (await res.json()) as ParseResult;
@@ -95,9 +101,7 @@ export default function InvoicesPage() {
   }
 
   useEffect(() => {
-    let sheet: string | undefined;
-    try { sheet = sessionStorage.getItem("accel_sheet") ?? undefined; } catch { /* unavailable */ }
-    loadLive(sheet);
+    (async () => { await loadLive(); })();
   }, []);
 
   async function refresh() {
