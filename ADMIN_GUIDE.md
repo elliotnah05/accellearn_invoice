@@ -1,7 +1,7 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 2 August 2026 (v0.12.2)
+**Last updated:** 2 August 2026 (v0.13.0)
 **Who it's for:** The centre owner and any admin who runs billing. Keep this file in the shared Google Drive folder and hand it to every new admin. New to the app? Read sections 1–4 in order. A short version history is at the very end.
 
 ---
@@ -205,7 +205,8 @@ Every student has a permanent **Student ID** (Master column I, mirrored to term 
 | A Student ID cleared by accident | Recovered automatically from that student's existing invoice/receipt marks |
 | The same Student ID on two students | Both are named, and their **Generate** / **Approve** buttons lock until it's corrected |
 | A status mark sitting beside the wrong student (rows shifted) | Named, with a prompt to restore the file before generating anything |
-| A student on Master not appearing on the term tab | Named, so they aren't silently left unbilled |
+| A student added anywhere on Master — including between two existing rows | Given a row in the same position on every live term tab automatically, so they're never left unbilled |
+| A student removed by clearing their Master row instead of deleting it | The lessons/fees left behind on the term tab are cleared, so they're billed to nobody (and never added to the student above) |
 | Marks copied from a previous term onto a new tab | The tab is named, with a reminder to clear columns I–R |
 | The order of students changed since the last refresh | Flagged as a possible accidental sort, with recovery instructions |
 | A leftover `#REF!` row from a student you deleted | Deleted automatically on the next Refresh (spreadsheet closed in Excel). Nobody is ever billed from it |
@@ -213,12 +214,11 @@ Every student has a permanent **Student ID** (Master column I, mirrored to term 
 **Responsibilities the app cannot take over.** These change the meaning of the data itself, so no automatic check can decide the right outcome — please follow them as standing practice:
 
 1. **Do not sort or reorder rows on Master.** Names on term tabs would move while each term's lessons, fees and receipt marks stay in place. The app will warn you, but the fix is manual — restore the previous version of the file (in Google Drive: right-click the file → **Version history**).
-2. **Add new students at the bottom of Master.** Inserting a row in the middle leaves the new student invisible on the term tabs.
-3. **Leave the Student ID columns alone** (Master **I**, term **S**). Never type, autofill or copy-drag them. The single exception is re-adding a returning student with the ID they had before.
-4. **Clear columns I–R when you create a term tab by copying another one.**
-5. **Freeze a term once it is finished** (§5) — otherwise a later change to a rate on Master would rewrite that term's completed figures.
-6. **One person edits the spreadsheet at a time.** It lives in a shared Drive folder; if two people save at once, the later save wins and the earlier edits are lost.
-7. **Check that Drive has finished syncing** before and after a billing run, so every admin is working from the same file.
+2. **Leave the Student ID columns alone** (Master **I**, term **S**). Never type, autofill or copy-drag them. The single exception is re-adding a returning student with the ID they had before.
+3. **Clear columns I–R when you create a term tab by copying another one.**
+4. **Freeze a term once it is finished** (§5) — otherwise a later change to a rate on Master would rewrite that term's completed figures.
+5. **One person edits the spreadsheet at a time.** It lives in a shared Drive folder; if two people save at once, the later save wins and the earlier edits are lost.
+6. **Check that Drive has finished syncing** before and after a billing run, so every admin is working from the same file.
 
 If a warning ever appears that you don't understand, the safe response is the same: **don't generate anything, and restore the file's previous version from Drive version history.** Documents already saved in the shared folder are never affected by this.
 
@@ -227,7 +227,11 @@ If a warning ever appears that you don't understand, the safe response is the sa
 ## 5. Common tasks
 
 ### Add a new student (30 seconds)
-Master tab → next free row → Name, Parent, School, Level, Subject, Duration, Rate → Save. (Serial No fills itself in; the app assigns their **Student ID** on the next refresh.) Two subjects? Add a second row, leave the name blank, merge A–E. They appear on every term tab automatically — go to the term and set their **Lessons (I)**.
+Master tab → **wherever they belong** → Name, Parent, School, Level, Subject, Duration, Rate → Save. (Serial No fills itself in; the app assigns their **Student ID** on the next refresh.) Two subjects? Add a second row directly under them, leave the name blank, merge A–E.
+
+**Put them where they belong in the list.** Master is grouped by level (P3 → JC2), so a new P3 goes among the other P3s: right-click the row *below* where they should sit → **Insert** → type them in. You do not have to add people at the bottom, and inserting in the middle does not disturb anybody else — every other student keeps their own lessons, fees, payments and receipt marks, because each term row follows its own student, not its position.
+
+On the next **⟳ Refresh** (spreadsheet closed in Excel) the app gives the new student a row in the same position on every live term tab and assigns their Student ID. Then go to the term and set their **Lessons (I)** — a blank cell bills the standard 12, so a mid-term joiner needs the real number typed in.
 
 ### A student who joins or leaves mid-term
 Master stays the full roster; each term's **Lessons (I)** decides who's billed and how much:
@@ -245,7 +249,7 @@ Remember: **blank = 12, `0` = not billed, any number = that many.**
 5. **Nothing else to do.** If a `#REF!` row briefly appears on a term tab, that is just the empty shell of the row you removed — the app deletes it for you on the next Refresh (with the spreadsheet closed in Excel). You never need to tidy the term tabs by hand.
 6. **Deleted too soon and need their invoice again?** Usually the PDF in the Drive folder *is* the record. If it's truly lost: re-add their row on Master and type their **old Student ID** into column I by hand (it's in the PDF filename), generate, then delete again.
 
-> **Why Master only?** Each term tab pulls its names from Master by formula. When you delete a row on Master, Excel moves every other row's link along with its student, so the rest of the tab stays correctly matched to the right people. Only the departed student's own row is left behind, and the app removes it for you.
+> **Why Master only?** Each term tab pulls its names from Master by formula. When you delete a row on Master, Excel moves every other row's link along with its student, so the rest of the tab stays correctly matched to the right people. Only the departed student's own row is left behind, and the app removes it for you. If you clear the row's contents instead of deleting the row, the app clears the lessons and fees left stranded on the term tabs instead — either way, nobody is billed from it and no one else is touched.
 
 ### Start a new term
 Most terms already exist as blank tabs. To start one:
@@ -301,7 +305,7 @@ The spreadsheet and PDFs hold personal data of **minors** and their parents. Sin
 | Invoice Issued (L) didn't get stamped | The app only writes it when you **Export to Folder** from the invoice review screen — previewing or downloading a single PDF doesn't touch the sheet. If it still shows blank after exporting, the sheet was probably open in Excel at that moment (check the banner on the export screen); close Excel and export again. |
 | Cleared Invoice Issued in Excel but the app still shows it issued | Save in Excel (Ctrl+S), then click **⟳ Refresh** on the invoice review screen — same as receipts, edits aren't visible until the file is saved and the app re-reads it. |
 | A term tab shows a formula / `0` where a name should be | A–H are linked to Master — edit **Master**. A `0` means the link lost its blank-check; the cell should read `=IF(Master!B2="","",Master!B2)`. |
-| A student added to Master isn't on the term tab | Confirm they're on **Master**, at or above **row 1000**, and the file is **saved**. Most often the row was inserted in the *middle* of Master — move them to the bottom instead. |
+| A student added to Master isn't on the term tab | Confirm they're on **Master**, at or above **row 1000**, and the file is **saved**. The app adds them on the next **⟳ Refresh** — it can only write while the spreadsheet is **closed in Excel**. A *frozen* term tab (§5) is deliberately never topped up. |
 | Yellow "Spreadsheet needs attention" panel | Read the lines in it — each names the exact student or row and the fix. See §4, *Safeguards*. Don't generate documents until it's cleared. |
 | "This student has no Student ID yet" | The spreadsheet was open in Excel when the app tried to assign one. Close Excel, click **⟳ Refresh**, and the ID appears. |
 | Red **⚠ Duplicate ID** on a student's row | Two students share a Student ID (usually from copy-dragging column I). On **Master**, clear the ID of the student who was added later, save, close Excel, then **⟳ Refresh** — a fresh ID is assigned and the buttons unlock. |
@@ -332,6 +336,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.13.0** — **Add a student anywhere on Master, not just at the bottom.** Inserting a row in the middle — next to the others of their level, which is how the roster reads — used to leave the new student invisible on every term tab and silently unbilled. The app now gives them a row in the same position on every live term tab (frozen terms are left alone), fills in their linked details and assigns their Student ID, all on the next Refresh. Adding an extra subject under an existing student works the same way. Removing a student by *clearing* their Master row (rather than deleting it) is now handled too: the lessons and fees stranded on the term tab are cleared instead of being quietly added to the student above.
 - **v0.12.2** — **The term tabs now clean themselves up.** After a student is removed on the Master tab, the empty row Excel leaves behind on each term tab is deleted automatically on the next Refresh, so removing a student really is a single action in a single place and there is nothing left to look at or tidy by hand.
 - **v0.12.1** — **Removing a student is now done on the `Master` tab alone.** Previously a deleted student left a broken row on each term tab that the app mistook for an extra subject of the student above, quietly inflating that student's fee. Those leftover rows are now recognised and skipped entirely, so nothing is billed from them and no one else is affected; the app mentions them only as optional tidy-up. Row numbers in messages now match the row numbers shown in Excel.
 - **v0.12.0** — **Permanent Student IDs.** Every child gets a code (`S001`, `S002`…) in Master column I, assigned by the app automatically and **never reused**. All matching — invoice numbers, receipt numbers, the marks written into columns L/O/R — now keys on this ID instead of the serial number, so **deleting or reordering students can no longer shift anyone's invoice/receipt history** (the bug where a deletion made the app re-issue invoices for everyone below). Serial No is now display-only. Invoice Issued stamps changed from `Yes` to `INV-… · date` so every mark identifies its child; the app detects and warns about marks sitting on the wrong row, leftover rows from deletions, and missing/duplicate IDs. Term-tab links to Master extended from row 500 to **row 1000** (the whole formatted sheet). Also added: automatic checks each refresh for duplicate IDs, marks sitting beside the wrong student, students missing from a term tab, marks copied from another term, and accidental re-sorting of Master — each shown as a "Spreadsheet needs attention" panel naming the student or row (§4, *Safeguards*). One-time upgrade: `node scripts/add-student-ids.js "<workbook.xlsx>"` (makes a backup, IDs all current students, audits for leftover deletion damage).

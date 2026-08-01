@@ -1,7 +1,7 @@
 import { readFileSync, statSync, existsSync, writeFileSync } from "fs";
 import path from "path";
 import { parseWorkbook, idOrderChanged } from "@/lib/parse-students";
-import { assignMissingStudentIds, removeBrokenLinkRows } from "@/lib/sheet-writeback";
+import { assignMissingStudentIds, syncTermRosters, tidyTermTabs } from "@/lib/sheet-writeback";
 import type { TemplateConfig } from "@/app/api/config/route";
 import { CONFIG_PATH, DATA_DIR, readJson } from "@/lib/paths";
 
@@ -64,18 +64,43 @@ export async function GET(request: Request) {
     }
     let result = parseWorkbook(readFileSync(file), requestedSheet);
 
-    // Removing a student is done on Master alone. Excel leaves a dead #REF! row
-    // on each term tab; clear those now so the admin never has to look at them
-    // or tidy them by hand. Deleting the row is also what realigns the tab, so
-    // the sheet returns to a clean state on its own. Best-effort: if Excel has
-    // the file open the rows are simply skipped this time (the parser already
-    // ignores them) and cleared on a later refresh.
-    if (result.errors.some((e) => e.startsWith("Tidy-up only"))) {
-      const cleaned = await removeBrokenLinkRows(config);
-      if (cleaned.removed > 0) {
+    // Removing a student is done on Master alone. Excel leaves a trace on each
+    // term tab — a dead #REF! row, or a nameless row still holding their
+    // lessons and fees; clear those now so the admin never has to look at them
+    // or tidy them by hand. Deleting the dead row is also what realigns the
+    // tab, so the sheet returns to a clean state on its own. Best-effort: if
+    // Excel has the file open the rows are simply skipped this time (the parser
+    // already ignores them) and cleared on a later refresh.
+    if (result.leftoverRows.length > 0) {
+      const cleaned = await tidyTermTabs(config);
+      if (cleaned.removed + cleaned.cleared > 0) {
         result = parseWorkbook(readFileSync(file), requestedSheet); // re-read the tidied sheet
       } else if (cleaned.warning) {
         result = { ...result, errors: [...result.errors, cleaned.warning] };
+      }
+    }
+
+    // Adding a student is done on Master alone too — including in the middle of
+    // the list, beside the others of their level. Excel shifts the existing
+    // links (so nobody else's lessons, fees or receipt marks move) but never
+    // creates a row for the newcomer, who would then never be billed. Give them
+    // one, in the same position they hold on Master, on every live term tab.
+    if (result.rosterGaps.length > 0) {
+      const synced = await syncTermRosters(config);
+      if (synced.rows > 0) {
+        result = parseWorkbook(readFileSync(file), requestedSheet); // re-read with the new rows
+        if (synced.names.length > 0) {
+          result = {
+            ...result,
+            errors: [
+              ...result.errors,
+              `Added to the term tabs: ${synced.names.join(", ")}. Check their Lessons and Material Fee for this ` +
+              `term before generating — a blank Lessons cell bills the standard 12, and 0 means not enrolled this term.`,
+            ],
+          };
+        }
+      } else if (synced.warning) {
+        result = { ...result, errors: [...result.errors, synced.warning] };
       }
     }
 

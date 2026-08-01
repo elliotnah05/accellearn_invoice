@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import {
   normalizeStudentId, isAppStudentId, recalcStudent,
-  type ParseResult, type Student, type SubjectLine,
+  type ParseResult, type RosterGap, type Student, type SubjectLine,
 } from "@/types/student";
 
 // Column index map (0-based) matching "student details LATEST.xlsx" (A–R).
@@ -141,6 +141,21 @@ function brokenLinkRows(ws: XLSX.WorkSheet): Set<number> {
   return rows;
 }
 
+/** Is this tab still mirroring Master (identity columns are formulas), or is it
+ *  a frozen past term whose formulas were turned into plain values? A frozen
+ *  term must never be topped up with students who joined later.
+ *
+ *  Only NAMED rows are checked: a formula that evaluates to blank is stored
+ *  with no value, and SheetJS drops such cells entirely — so blank mirror rows
+ *  are invisible here, and only the ones showing a name can be relied on. */
+function isLinkedTab(ws: XLSX.WorkSheet, lastRow: number): boolean {
+  for (let r = 1; r < lastRow; r++) {
+    const cell = ws[XLSX.utils.encode_cell({ r, c: COL.studentName })] as { f?: string } | undefined;
+    if (cell?.f && /Master!/i.test(cell.f)) return true;
+  }
+  return false;
+}
+
 /** First tab that isn't Master; falls back to the first tab for older
  *  single-sheet workbooks that have no Master at all. */
 export function activeTermSheet(names: string[]): string {
@@ -224,14 +239,24 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     };
   }
 
-  // A row carries subject content if it has a subject name or any fee/rate data.
-  function hasSubjectData(row: Row): boolean {
-    return (
-      cellVal(row, COL.subject) !== "" ||
-      numVal(row, COL.ratePerHour) !== 0 ||
-      numVal(row, COL.adjustment) !== 0 ||
-      numVal(row, COL.lessons) !== 0
-    );
+  // Identity (A–H) is mirrored from Master. A row with a blank name but a
+  // subject/rate is one of a child's extra subjects; a row with NOTHING in B–H
+  // mirrors a Master row that is empty — nobody. Column A is deliberately left
+  // out: it's a running count, not identity, and a stale one would make an
+  // empty row look occupied.
+  function hasIdentityData(row: Row): boolean {
+    for (let c = COL.studentName; c <= COL.ratePerHour; c++) {
+      if (cellVal(row, c) !== "") return true;
+    }
+    return false;
+  }
+
+  // I–R: this term's own typed data (lessons, fees, payment/receipt marks).
+  function hasTermData(row: Row): boolean {
+    for (let c = COL.lessons; c <= COL.receiptSent; c++) {
+      if (cellVal(row, c) !== "") return true;
+    }
+    return false;
   }
 
   let current: Student | null = null; // the child rows are currently attaching to
@@ -255,7 +280,16 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
 
     // ── Continuation row (merged/blank Student Name) = another subject for the child above ──
     if (!studentName) {
-      if (!hasSubjectData(row)) continue; // truly empty filler row
+      // Identity blank right across A–H: this row mirrors an empty Master row.
+      // If it still holds term data, that data belonged to a student whose
+      // Master row was CLEARED rather than deleted (clearing leaves the link
+      // intact, so there's no #REF! to spot it by). It must not be read as an
+      // extra subject for the child above — that would silently move a departed
+      // student's lessons and fees onto their invoice.
+      if (!hasIdentityData(row)) {
+        if (hasTermData(row)) leftoverRows.push(i + 1);
+        continue;
+      }
       if (!current) {
         errors.push(`Row ${i + 1}: subject data with no student name above it — skipped. Put the child's name on the first row.`);
         continue;
@@ -367,28 +401,68 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     }
   }
 
-  // Roster completeness: every child on Master should appear on the ACTIVE term
-  // tab (identity columns are mirrored by formulas). If someone is on Master but
-  // invisible here, a row was inserted into the middle of Master (the mirror
-  // formulas skew and the new row has no mirror), or their term-tab row was
-  // deleted. Either way they'd silently never be billed — say so.
-  if (mastersheet && sheetName === activeTermSheet(wb.SheetNames)) {
-    const termIds   = new Set(students.map((s) => s.studentId).filter(Boolean));
-    const termNames = new Set(students.map((s) => s.studentName.trim().toLowerCase()));
-    const missing: string[] = [];
-    const mRaw = XLSX.utils.sheet_to_json<Row>(mastersheet, { header: 1, defval: "", blankrows: false });
+  // Roster completeness: every row on Master should have a row on this term tab
+  // mirroring it. A student added in the MIDDLE of Master has none — Excel
+  // shifts the existing links down along with the students they point at, but
+  // it never creates a row for the newcomer, so they'd silently never be
+  // billed. Matched by link, not by name: two children can share a name, and a
+  // renamed child must still count as the same row.
+  //
+  // Only linked tabs are checked. A frozen past term (freeze-term.js turns its
+  // formulas into values) legitimately has no links and must not gain students.
+  const rosterGaps: RosterGap[] = [];
+  if (mastersheet && isLinkedTab(ws, raw.length)) {
+    // Read Master the same way a term tab is read: a named row starts a child,
+    // rows under it with a subject but no name are that child's extra subjects.
+    // blankrows:true keeps mMaster[i] on sheet row i+1, so reported row numbers
+    // are the ones the admin sees.
+    const mRaw = XLSX.utils.sheet_to_json<Row>(mastersheet, { header: 1, defval: "", blankrows: true });
+    const masterChildren: { row: number; name: string; id: string; subjectRows: number[] }[] = [];
     for (let i = 1; i < mRaw.length; i++) {
-      const name = cellVal(mRaw[i], COL.studentName);
-      if (!name || isErrorText(name)) continue;
-      const id = normalizeStudentId(cellVal(mRaw[i], 8)); // Master column I
-      const onTerm = id ? termIds.has(id) : termNames.has(name.trim().toLowerCase());
-      if (!onTerm) missing.push(name);
+      const mRow = mRaw[i];
+      if (!mRow) continue;
+      const name = cellVal(mRow, COL.studentName);
+      if (name && !isErrorText(name)) {
+        masterChildren.push({
+          row: i + 1,
+          name,
+          id: normalizeStudentId(cellVal(mRow, 8)), // Master column I
+          subjectRows: [i + 1],
+        });
+        continue;
+      }
+      // Extra-subject row: subject/duration/rate typed with no name of its own.
+      const last = masterChildren[masterChildren.length - 1];
+      const isSubjectRow =
+        cellVal(mRow, COL.subject) !== "" || numVal(mRow, COL.ratePerHour) !== 0 || numVal(mRow, COL.durationHrs) !== 0;
+      if (last && isSubjectRow) last.subjectRows.push(i + 1);
     }
-    if (missing.length > 0) {
+
+    // Matched on the mirrored VALUES, not on the link formulas: a formula whose
+    // result is blank isn't stored in the file at all, so half the links are
+    // invisible from this side. Student ID first (permanent), name second (a
+    // child added just now has no ID until the app assigns one).
+    const byId = new Map(students.filter((s) => s.studentId).map((s) => [s.studentId, s]));
+    const byName = new Map(students.map((s) => [s.studentName.trim().toLowerCase(), s]));
+    for (const child of masterChildren) {
+      const onTerm = (child.id && byId.get(child.id)) || byName.get(child.name.trim().toLowerCase());
+      if (!onTerm) {
+        rosterGaps.push({ masterRow: child.row, name: child.name });
+      } else if (onTerm.subjects.length < child.subjectRows.length) {
+        // The child is there but one of their subjects isn't — a subject row
+        // added on Master under an existing student.
+        for (const row of child.subjectRows.slice(onTerm.subjects.length)) {
+          rosterGaps.push({ masterRow: row, name: child.name });
+        }
+      }
+    }
+
+    if (rosterGaps.length > 0) {
+      const named = [...new Set(rosterGaps.map((g) => g.name).filter(Boolean))];
       errors.push(
-        `${missing.length} student(s) on Master are NOT appearing on this term tab (${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}) ` +
-        `— they would never be billed. This happens when a row is inserted into the MIDDLE of Master (always add new students at the bottom) ` +
-        `or when their row on this tab was deleted. Move them to the bottom of Master, or restore an earlier version of the file.`
+        `Tidy-up only (nothing is wrong): ${named.length} student(s) you added on Master ` +
+        `(${named.slice(0, 3).join(", ")}${named.length > 3 ? "…" : ""}) aren't on this term tab yet. ` +
+        `The app adds them for you automatically — if they're still missing, close the spreadsheet in Excel and press Refresh.`
       );
     }
   }
@@ -398,5 +472,7 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     students: students.map(recalcStudent),
     errors,
     sheetNames: termSheets,
+    rosterGaps,
+    leftoverRows,
   };
 }

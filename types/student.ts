@@ -42,6 +42,15 @@ export interface Student {
   totalFee: number;      // sum of subject subtotals
 }
 
+/** A row on Master that this term tab has no mirror row for — a student the
+ *  admin added, typically in the middle of the list next to others of their
+ *  level. Until a row is added they can't be billed, so the app creates it. */
+export interface RosterGap {
+  masterRow: number;
+  /** Blank for an extra-subject row (the child's name sits on the row above). */
+  name: string;
+}
+
 export interface ParseResult {
   sheetName: string;
   students: Student[];
@@ -49,6 +58,13 @@ export interface ParseResult {
   /** Every term tab in the workbook (all sheets except Master), in tab order —
    *  drives the term picker so it reflects whatever tabs currently exist. */
   sheetNames: string[];
+  /** Master rows with no row on this term tab yet (see RosterGap). Empty on a
+   *  frozen term tab, which is deliberately never topped up. */
+  rosterGaps: RosterGap[];
+  /** Sheet rows (1-based) left behind by a student removed on Master: a broken
+   *  #REF! row, or a nameless row still holding their term data. Billed to
+   *  nobody; the app tidies them away. */
+  leftoverRows: number[];
 }
 
 export function recalcLine(l: SubjectLine): SubjectLine {

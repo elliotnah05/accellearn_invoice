@@ -11,6 +11,8 @@ import { normalizeStudentId } from "@/types/student";
 // the receipt generation.
 
 const COL_STUDENT_NAME   = 2;  // B
+const COL_IDENTITY_LAST  = 8;  // H — last column mirrored from Master
+const COL_TERM_FIRST     = 9;  // I — first per-term column (Lessons)
 const COL_INVOICE_ISSUED = 12; // L
 const COL_RECEIPT_ISSUED = 15; // O
 const COL_RECEIPT_SENT   = 18; // R
@@ -83,6 +85,20 @@ function cellText(cell: ExcelJS.Cell): string {
     return "";
   }
   return v === null || v === undefined ? "" : String(v).trim();
+}
+
+/** Which Master row a term row mirrors, read from its Student Name formula
+ *  (=IF(Master!B15="","",Master!B15) → 15). This is the only trustworthy link:
+ *  term row 100 does NOT necessarily mirror Master row 100 — inserting or
+ *  deleting rows on Master leaves the two sheets offset from each other, and
+ *  every check has to follow the row's own formula instead of assuming.
+ *  Null when the cell isn't a Master-linked formula (a frozen tab holds plain
+ *  values) or when the link is broken (#REF!). */
+function linkedMasterRow(cell: ExcelJS.Cell): number | null {
+  const v = cell.value;
+  if (!v || typeof v !== "object" || !("formula" in v)) return null;
+  const m = String((v as ExcelJS.CellFormulaValue).formula).match(/Master!\$?B\$?(\d+)/i);
+  return m ? Number(m[1]) : null;
 }
 
 function findRowByStudentId(ws: ExcelJS.Worksheet, studentId: string): ExcelJS.Row | null {
@@ -174,7 +190,10 @@ export interface AssignResult {
 
 export interface CleanupResult {
   ok: boolean;
+  /** Dead #REF! rows deleted (student's Master row was deleted). */
   removed: number;
+  /** Rows whose stale term data was cleared (Master row was blanked instead). */
+  cleared: number;
   warning?: string;
 }
 
@@ -198,47 +217,263 @@ function brokenRows(ws: ExcelJS.Worksheet): number[] {
 }
 
 /**
- * Deletes the leftover rows a term tab keeps after a student is removed on
- * Master, so the admin's single action — delete the student where they were
- * typed — leaves every tab clean, with no #REF! for them to look at or tidy up
- * by hand.
+ * Clears what a term tab keeps behind after a student is removed on Master, so
+ * the admin's single action — remove the student where they were typed — leaves
+ * every tab clean, with nothing for them to look at or tidy up by hand.
  *
- * Removing the row is what realigns the tab. Excel has already repointed the
- * rows below to follow their own students; deleting the dead row in between
- * shifts that block up so each row's term data sits beside the student it
- * belongs to again. References to Master are untouched by an in-sheet row
- * delete, so nothing else moves.
+ * There are two traces, because there are two ways to remove someone:
+ *
+ *  • DELETE the Master row → the term row's links break (#REF!). Deleting that
+ *    row is what realigns the tab: Excel has already repointed the rows below
+ *    to follow their own students, so dropping the dead row in between shifts
+ *    that block up and each row's term data sits beside its student again.
+ *    References to Master are untouched by an in-sheet row delete.
+ *
+ *  • CLEAR the Master row instead → the links stay valid and simply mirror
+ *    blanks, leaving a nameless row still holding the departed student's
+ *    lessons and fees. Here the row must stay (it still lines up with the
+ *    empty Master row); only its term data is wiped.
  *
  * Never touches Master (that's the admin's own list) and never touches a row
  * that still resolves to a student. Best-effort like every write-back: a file
  * open in Excel yields a warning, not a failure.
  */
-export async function removeBrokenLinkRows(config: TemplateConfig): Promise<CleanupResult> {
+export async function tidyTermTabs(config: TemplateConfig): Promise<CleanupResult> {
   const file = config.spreadsheetPath?.trim();
-  if (!file) return { ok: false, removed: 0, warning: "Spreadsheet path not set in Invoice Template → Folders." };
-  if (!existsSync(file)) return { ok: false, removed: 0, warning: "Spreadsheet file not found." };
+  if (!file) return { ok: false, removed: 0, cleared: 0, warning: "Spreadsheet path not set in Invoice Template → Folders." };
+  if (!existsSync(file)) return { ok: false, removed: 0, cleared: 0, warning: "Spreadsheet file not found." };
   try {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(file);
     let removed = 0;
+    let cleared = 0;
     for (const ws of wb.worksheets) {
       if (isMasterSheet(ws.name)) continue;
       for (const r of brokenRows(ws)) {
         ws.spliceRows(r, 1);
         removed++;
       }
+      for (let r = 2; r <= ws.rowCount; r++) {
+        const row = ws.getRow(r);
+        if (linkedMasterRow(row.getCell(COL_STUDENT_NAME)) === null) continue;
+        // B–H, not A: column A is a running count mirrored from Master, not
+        // identity, and a stale one would keep a dead row looking occupied.
+        let identity = false;
+        for (let c = COL_STUDENT_NAME; c <= COL_IDENTITY_LAST; c++) if (cellText(row.getCell(c)) !== "") { identity = true; break; }
+        if (identity) continue;
+        let hasTermData = false;
+        for (let c = COL_TERM_FIRST; c <= COL_RECEIPT_SENT; c++) if (cellText(row.getCell(c)) !== "") { hasTermData = true; break; }
+        if (!hasTermData) continue;
+        for (let c = COL_TERM_FIRST; c <= COL_RECEIPT_SENT; c++) row.getCell(c).value = null;
+        cleared++;
+      }
     }
-    if (removed === 0) return { ok: true, removed: 0 };
+    if (removed === 0 && cleared === 0) return { ok: true, removed: 0, cleared: 0 };
     await wb.xlsx.writeFile(file);
-    return { ok: true, removed };
+    return { ok: true, removed, cleared };
   } catch (err) {
     const busy = err instanceof Error && err.message.includes("EBUSY");
     return {
       ok: false,
       removed: 0,
+      cleared: 0,
       warning: busy
         ? "Close the spreadsheet in Excel and press Refresh — the app will clear the leftover rows from the term tabs."
         : "Could not clear the leftover rows from the term tabs.",
+    };
+  }
+}
+
+export interface RosterSyncResult {
+  ok: boolean;
+  /** Names of students given a row on one or more term tabs. */
+  names: string[];
+  /** Total rows inserted across all tabs (a two-subject child is two rows). */
+  rows: number;
+  warning?: string;
+}
+
+/** Underlying value of a cell, formulas resolved to their cached result, with
+ *  the original type preserved — a rate must stay the number 40, not "40". */
+function rawValue(cell: ExcelJS.Cell): string | number | null {
+  const v = cell.value;
+  if (v === null || v === undefined) return null;
+  if (typeof v === "object") {
+    if ("formula" in v) {
+      const r = (v as ExcelJS.CellFormulaValue).result;
+      return typeof r === "number" || typeof r === "string" ? r : null;
+    }
+    if ("richText" in v) return (v as ExcelJS.CellRichTextValue).richText.map((t) => t.text).join("");
+    return null;
+  }
+  return typeof v === "number" || typeof v === "string" ? v : null;
+}
+
+/** Does this Master row hold a student or one of their subject lines? Columns
+ *  B–H only: column A is a fill-down serial formula that sits on empty rows too,
+ *  so counting it would make every blank row look occupied. Merge continuation
+ *  cells report their master's value in ExcelJS but read blank to the parser —
+ *  ignored here so both sides agree on what a data row is. */
+function masterRowHasData(master: ExcelJS.Worksheet, r: number): boolean {
+  const row = master.getRow(r);
+  for (let c = COL_STUDENT_NAME; c <= COL_IDENTITY_LAST; c++) {
+    const cell = row.getCell(c);
+    if (cell.type === ExcelJS.ValueType.Merge) continue;
+    if (cellText(cell) !== "") return true;
+  }
+  return false;
+}
+
+/** A blank spare row at the bottom of a term tab: mirrors an empty Master row
+ *  and carries no term data of its own. Safe to drop — that's all it is. */
+function isSpareMirrorRow(ws: ExcelJS.Worksheet, r: number): boolean {
+  const row = ws.getRow(r);
+  if (linkedMasterRow(row.getCell(COL_STUDENT_NAME)) === null) return false;
+  for (let c = 1; c <= COL_STUDENT_ID; c++) {
+    if (cellText(row.getCell(c)) !== "") return false;
+  }
+  return true;
+}
+
+/** Adds one term-tab row mirroring Master row `masterRow`, at row `pos`.
+ *
+ *  A–H and S become the same linked formulas every other row uses, with the
+ *  cached result filled in so the app sees the child immediately — before the
+ *  workbook is ever opened in Excel again. I–R (lessons, fees, payment and
+ *  receipt status) start blank: this term's data is the admin's to type.
+ *
+ *  Rows below shift down carrying their own formulas and their own term data
+ *  together, so nobody else's row changes meaning. */
+function insertMirrorRow(ws: ExcelJS.Worksheet, pos: number, master: ExcelJS.Worksheet, masterRow: number): void {
+  ws.spliceRows(pos, 0, []);
+  // The row we just pushed down is the local look of the sheet (banding, fonts,
+  // column formats). Column A never carries a receipt status fill, so its fill
+  // is this row's true banding colour — reuse it everywhere so no leftover
+  // red/green shading is inherited.
+  const template = ws.getRow(pos + 1 <= ws.rowCount ? pos + 1 : Math.max(2, pos - 1));
+  const clone = <T>(o: T): T => (o == null ? o : JSON.parse(JSON.stringify(o)));
+  const baseFill = clone(template.getCell(1).style?.fill);
+  const row = ws.getRow(pos);
+  if (template.height) row.height = template.height;
+
+  for (let c = 1; c <= COL_STUDENT_ID; c++) {
+    const cell = row.getCell(c);
+    const style = clone(template.getCell(c).style ?? {});
+    if (baseFill) style.fill = clone(baseFill);
+    cell.style = style; // fresh object per cell — never share (see styleCell)
+
+    const masterCol = c === COL_STUDENT_ID ? MASTER_COL_ID : c;
+    if (c > COL_IDENTITY_LAST && c !== COL_STUDENT_ID) {
+      cell.value = null;
+      continue;
+    }
+    const letter = String.fromCharCode(64 + masterCol);
+    const cached = rawValue(master.getRow(masterRow).getCell(masterCol));
+    cell.value = {
+      formula: `IF(Master!${letter}${masterRow}="","",Master!${letter}${masterRow})`,
+      ...(cached === null || cached === "" ? {} : { result: cached }),
+    } as ExcelJS.CellFormulaValue;
+  }
+}
+
+/**
+ * Gives every student on Master a row on every live term tab.
+ *
+ * Adding a student is done on Master alone — including in the MIDDLE of the
+ * list, next to the others of their level, which is how the roster is meant to
+ * read. Excel handles half of that by itself: inserting a row shifts the term
+ * tabs' link formulas along with the students they point at, so everyone else
+ * keeps their own lessons, fees and receipt marks. What Excel does NOT do is
+ * create a row for the new child — no term row points at them, so they'd never
+ * be billed. This adds those rows, in the same position they hold on Master.
+ *
+ * Every tab is checked, so terms prepared in advance stay complete too. Frozen
+ * tabs (past terms converted to plain values by freeze-term.js) hold no links
+ * and are deliberately left alone — a finished term must not gain students.
+ *
+ * Never touches Master, never touches an existing row's data. Best-effort like
+ * every write-back: a file open in Excel yields a warning, not a failure.
+ */
+export async function syncTermRosters(config: TemplateConfig): Promise<RosterSyncResult> {
+  const file = config.spreadsheetPath?.trim();
+  if (!file) return { ok: false, names: [], rows: 0, warning: "Spreadsheet path not set in Invoice Template → Folders." };
+  if (!existsSync(file)) return { ok: false, names: [], rows: 0, warning: "Spreadsheet file not found." };
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(file);
+    const master = wb.worksheets.find((w) => isMasterSheet(w.name));
+    if (!master) return { ok: false, names: [], rows: 0, warning: "No Master tab — cannot check the term tabs." };
+
+    const dataRows: number[] = [];
+    for (let r = 2; r <= master.rowCount; r++) if (masterRowHasData(master, r)) dataRows.push(r);
+
+    const names = new Set<string>();
+    let rows = 0;
+
+    for (const ws of wb.worksheets) {
+      if (isMasterSheet(ws.name)) continue;
+
+      // termRow → masterRow for every linked row on this tab.
+      let links: { termRow: number; masterRow: number }[] = [];
+      for (let r = 2; r <= ws.rowCount; r++) {
+        const m = linkedMasterRow(ws.getRow(r).getCell(COL_STUDENT_NAME));
+        if (m !== null) links.push({ termRow: r, masterRow: m });
+      }
+      if (links.length === 0) continue; // frozen term — plain values, no links
+
+      const mirrored = new Set(links.map((l) => l.masterRow));
+      // Who this tab already shows, by value. A tab can hold rows that aren't
+      // linked at all (someone pasted values over part of it), and those rows
+      // still bill the student — inserting a mirror beside one would invoice
+      // them twice. Matching on the visible name/ID is what rules that out.
+      const onTab = new Set<string>();
+      for (let r = 2; r <= ws.rowCount; r++) {
+        const name = cellText(ws.getRow(r).getCell(COL_STUDENT_NAME)).toLowerCase();
+        const id = normalizeStudentId(cellText(ws.getRow(r).getCell(COL_STUDENT_ID)));
+        if (name) onTab.add(name);
+        if (id) onTab.add(id);
+      }
+      const missing = dataRows.filter((r) => {
+        if (mirrored.has(r)) return false;
+        const name = cellText(master.getRow(r).getCell(COL_STUDENT_NAME)).toLowerCase();
+        const id = normalizeStudentId(cellText(master.getRow(r).getCell(MASTER_COL_ID)));
+        return !(name && onTab.has(name)) && !(id && onTab.has(id));
+      });
+      if (missing.length === 0) continue;
+
+      for (const m of missing) {
+        // Slot the new row where it belongs: straight after the row mirroring
+        // the nearest student ABOVE them on Master, so the tab keeps Master's
+        // order (which is the admin's level grouping).
+        const prev = links.filter((l) => l.masterRow < m).reduce((max, l) => Math.max(max, l.termRow), 0);
+        const pos = prev > 0 ? prev + 1 : links[0].termRow;
+        insertMirrorRow(ws, pos, master, m);
+        links = links.map((l) => (l.termRow >= pos ? { ...l, termRow: l.termRow + 1 } : l));
+        links.push({ termRow: pos, masterRow: m });
+        rows++;
+        const name = cellText(master.getRow(m).getCell(COL_STUDENT_NAME));
+        if (name) names.add(name);
+      }
+
+      // Each tab keeps a tail of blank spare rows. Give back as many as were
+      // used up so the sheet doesn't grow a row longer on every addition.
+      for (let k = 0; k < missing.length && ws.rowCount > 2 && isSpareMirrorRow(ws, ws.rowCount); k++) {
+        ws.spliceRows(ws.rowCount, 1);
+      }
+    }
+
+    if (rows === 0) return { ok: true, names: [], rows: 0 };
+    await wb.xlsx.writeFile(file);
+    return { ok: true, names: [...names], rows };
+  } catch (err) {
+    const busy = err instanceof Error && err.message.includes("EBUSY");
+    return {
+      ok: false,
+      names: [],
+      rows: 0,
+      warning: busy
+        ? "Close the spreadsheet in Excel and press Refresh — the app will add the new student(s) to the term tabs."
+        : "Could not add the new student(s) to the term tabs.",
     };
   }
 }
@@ -318,10 +553,7 @@ export async function assignMissingStudentIds(config: TemplateConfig): Promise<A
       for (const ws of wb.worksheets) {
         if (isMasterSheet(ws.name)) continue;
         for (let r = 2; r <= ws.rowCount; r++) {
-          const v = ws.getRow(r).getCell(COL_STUDENT_NAME).value;
-          if (!v || typeof v !== "object" || !("formula" in v)) continue;
-          const m = String((v as ExcelJS.CellFormulaValue).formula).match(/Master!\$?B\$?(\d+)/i);
-          if (!m || Number(m[1]) !== masterRow) continue;
+          if (linkedMasterRow(ws.getRow(r).getCell(COL_STUDENT_NAME)) !== masterRow) continue;
           const row = ws.getRow(r);
           const fromStamp =
             stampId(cellText(row.getCell(COL_INVOICE_ISSUED))) ||
@@ -367,16 +599,12 @@ export async function assignMissingStudentIds(config: TemplateConfig): Promise<A
         ws.getColumn(COL_STUDENT_ID).width = 12;
       }
       for (let r = 2; r <= ws.rowCount; r++) {
-        const nameCell = ws.getRow(r).getCell(COL_STUDENT_NAME);
-        const v = nameCell.value;
-        const linked = v && typeof v === "object" && "formula" in v;
-        if (!linked) continue;
         // Follow the row's OWN link target rather than assuming term row r maps
         // to Master row r: past insertions/deletions leave link formulas skewed
         // (e.g. term row 100 → Master row 99), and the ID must stay attached to
         // the same student the name formula shows.
-        const m = String((v as ExcelJS.CellFormulaValue).formula).match(/Master!\$?B\$?(\d+)/i);
-        const t = m ? Number(m[1]) : r;
+        const t = linkedMasterRow(ws.getRow(r).getCell(COL_STUDENT_NAME));
+        if (t === null) continue;
         const masterVal = cellText(master.getRow(t).getCell(MASTER_COL_ID));
         ws.getRow(r).getCell(COL_STUDENT_ID).value = {
           formula: `IF(Master!I${t}="","",Master!I${t})`,
