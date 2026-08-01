@@ -71,7 +71,16 @@ export async function GET(request: Request) {
     // tab, so the sheet returns to a clean state on its own. Best-effort: if
     // Excel has the file open the rows are simply skipped this time (the parser
     // already ignores them) and cleared on a later refresh.
-    if (result.leftoverRows.length > 0) {
+    //
+    // leftoverRows is only computed for the tab just parsed. If that tab is a
+    // FROZEN past term (plain values, no Master links), it can never carry
+    // leftoverRows of its own, so that check alone would never fire while a
+    // frozen tab is being viewed — even though husk rows may be sitting
+    // uncleared on the OTHER, still-linked term tabs. tidyTermTabs sweeps
+    // every non-Master tab regardless of which one was parsed, so also run it
+    // whenever the workbook has a Master tab but the parsed tab isn't linked
+    // to it.
+    if (result.leftoverRows.length > 0 || (result.hasMaster && !result.masterLinked)) {
       const cleaned = await tidyTermTabs(config);
       if (cleaned.removed + cleaned.cleared > 0) {
         result = parseWorkbook(readFileSync(file), requestedSheet); // re-read the tidied sheet

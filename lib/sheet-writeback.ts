@@ -6,9 +6,9 @@ import { readLedger } from "@/lib/billing-store";
 import { normalizeStudentId } from "@/types/student";
 
 // Writes receipt status back into the master spreadsheet so Excel and the app
-// always tell the same story. Best-effort: if the file is open in Excel
-// (EBUSY) or not configured, we return a warning string instead of failing
-// the receipt generation.
+// always tell the same story. Best-effort: if the file is open in Excel or
+// otherwise locked/read-only (EBUSY/EPERM/EACCES) or not configured, we
+// return a warning string instead of failing the receipt generation.
 
 const COL_STUDENT_NAME   = 2;  // B
 const COL_IDENTITY_LAST  = 8;  // H — last column mirrored from Master
@@ -28,6 +28,14 @@ const FILL_SENT            = { type: "pattern", pattern: "solid", fgColor: { arg
 export interface WritebackResult {
   ok: boolean;
   warning?: string;
+}
+
+/** Is this the "can't write, the file is locked/read-only" case? EBUSY is the
+ *  common one (Excel has it open on Windows), but a Drive-locked or
+ *  read-only file surfaces as EPERM or EACCES instead depending on OS/cause —
+ *  all three mean the same thing to the admin: close Excel and try again. */
+function isBusyFileError(err: unknown): boolean {
+  return err instanceof Error && /\b(EBUSY|EPERM|EACCES)\b/.test(err.message);
 }
 
 async function withSheet(
@@ -52,7 +60,7 @@ async function withSheet(
     await wb.xlsx.writeFile(file);
     return { ok: true };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isBusyFileError(err);
     return {
       ok: false,
       warning: busy
@@ -272,7 +280,7 @@ export async function tidyTermTabs(config: TemplateConfig): Promise<CleanupResul
     await wb.xlsx.writeFile(file);
     return { ok: true, removed, cleared };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isBusyFileError(err);
     return {
       ok: false,
       removed: 0,
@@ -466,7 +474,7 @@ export async function syncTermRosters(config: TemplateConfig): Promise<RosterSyn
     await wb.xlsx.writeFile(file);
     return { ok: true, names: [...names], rows };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isBusyFileError(err);
     return {
       ok: false,
       names: [],
@@ -616,7 +624,7 @@ export async function assignMissingStudentIds(config: TemplateConfig): Promise<A
     await wb.xlsx.writeFile(file);
     return { ok: true, assigned: assignedRows.length };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isBusyFileError(err);
     return {
       ok: false,
       assigned: 0,

@@ -65,6 +65,16 @@ export interface ParseResult {
    *  #REF! row, or a nameless row still holding their term data. Billed to
    *  nobody; the app tidies them away. */
   leftoverRows: number[];
+  /** Whether the PARSED tab's identity columns (A–H) are still formula-linked
+   *  to Master, i.e. this is a live term and not a frozen past one. Frozen
+   *  tabs hold plain values, so they never surface leftoverRows/rosterGaps of
+   *  their own — a caller that only reacts to leftoverRows on the parsed tab
+   *  misses husk rows sitting on other, still-linked tabs while a frozen tab
+   *  is the one being viewed. */
+  masterLinked: boolean;
+  /** Whether the workbook has a Master tab at all (false only for very old,
+   *  single-sheet workbooks that predate it — see v0.4.0). */
+  hasMaster: boolean;
 }
 
 export function recalcLine(l: SubjectLine): SubjectLine {

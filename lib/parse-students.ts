@@ -411,7 +411,8 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
   // Only linked tabs are checked. A frozen past term (freeze-term.js turns its
   // formulas into values) legitimately has no links and must not gain students.
   const rosterGaps: RosterGap[] = [];
-  if (mastersheet && isLinkedTab(ws, raw.length)) {
+  const masterLinked = isLinkedTab(ws, raw.length);
+  if (mastersheet && masterLinked) {
     // Read Master the same way a term tab is read: a named row starts a child,
     // rows under it with a subject but no name are that child's extra subjects.
     // blankrows:true keeps mMaster[i] on sheet row i+1, so reported row numbers
@@ -474,5 +475,7 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     sheetNames: termSheets,
     rosterGaps,
     leftoverRows,
+    masterLinked,
+    hasMaster: !!mastersheet,
   };
 }
