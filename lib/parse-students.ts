@@ -105,6 +105,42 @@ function sheetSlug(name: string): string {
   return name.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "TERM";
 }
 
+/**
+ * Sheet rows (1-based) whose identity cells hold an Excel error — the husk a
+ * term tab keeps when the student's row is deleted from Master.
+ *
+ * This is the normal, expected result of removing a student: the admin deletes
+ * the row on Master (the one place a student is typed), and Excel repoints
+ * every OTHER term row's formula along with its student, so the rest of the
+ * tab stays correctly matched. Only the departed student's own row breaks, and
+ * it breaks visibly, as #REF!.
+ *
+ * Those rows must be skipped outright. Their identity resolves to nothing while
+ * their old typed term data (lessons, fees, status marks) is still sitting
+ * there, so treating one as a normal row would silently bill it — and because
+ * its name cell reads blank, the plain continuation rule would otherwise hand
+ * that data to the child above as an extra subject.
+ *
+ * sheet_to_json flattens error cells to "", which is exactly why this reads the
+ * raw cells instead: an error cell is type "e" and is unambiguous.
+ */
+function brokenLinkRows(ws: XLSX.WorkSheet): Set<number> {
+  const rows = new Set<number>();
+  const ref = ws["!ref"];
+  if (!ref) return rows;
+  const range = XLSX.utils.decode_range(ref);
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (const c of [COL.studentName, COL.studentId] as number[]) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })] as { t?: string } | undefined;
+      if (cell && cell.t === "e") {
+        rows.add(r + 1);
+        break;
+      }
+    }
+  }
+  return rows;
+}
+
 /** First tab that isn't Master; falls back to the first tab for older
  *  single-sheet workbooks that have no Master at all. */
 export function activeTermSheet(names: string[]): string {
@@ -153,16 +189,22 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
   const masterName = wb.SheetNames.find(isMasterSheet);
   const mastersheet = masterName ? wb.Sheets[masterName] : undefined;
 
+  // blankrows:true keeps index alignment with real sheet rows (raw[i] is sheet
+  // row i+1), so reported row numbers match what the admin sees in Excel and
+  // the orphan-row lookup below can be keyed by row number. Blank rows are
+  // still skipped by the loop itself.
   const raw = XLSX.utils.sheet_to_json<Row>(ws, {
     header: 1,
     defval: "",
-    blankrows: false,
+    blankrows: true,
   });
+  const orphanRows = brokenLinkRows(ws);
 
   const errors: string[] = [];
   const students: Student[] = [];
   const seenSerials = new Set<number>();
   const seenIds = new Map<string, string>(); // studentId → first student name using it
+  const leftoverRows: number[] = [];         // rows left behind by a deletion on Master
 
   // Build the subject line for a data row.
   function buildLine(row: Row, rowNum: number, name: string): SubjectLine {
@@ -201,15 +243,13 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
 
     const studentName = cellVal(row, COL.studentName);
 
-    // ── Leftover of a deleted Master row: identity formulas broken (#REF!) but
-    // the static status columns still hold the deleted child's data. Surface it
-    // for cleanup rather than mis-attaching that data to a neighbour. ──
-    if (isErrorText(studentName)) {
-      errors.push(
-        `Row ${i + 1}: broken link to Master (${studentName}) — this looks like a leftover row from a ` +
-        `deleted student. Delete this row on this tab (right-click the row number → Delete).`
-      );
-      current = null; // whatever follows must not attach to the deleted child
+    // ── Leftover row from a student deleted on Master. Skipped entirely: it is
+    // billed to nobody and, crucially, is NOT offered to the child above as an
+    // extra subject. `current` is deliberately left untouched so that deleting
+    // one subject of a multi-subject child doesn't detach their remaining
+    // subject rows. ──
+    if (orphanRows.has(i + 1) || isErrorText(studentName)) {
+      leftoverRows.push(i + 1);
       continue;
     }
 
@@ -276,6 +316,18 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
       totalFee: 0,
     };
     students.push(current);
+  }
+
+  // Leftover rows are the normal trace of removing a student on Master. They
+  // are already excluded from billing, so this is housekeeping, not a fault —
+  // worded that way so it doesn't read as something being wrong.
+  if (leftoverRows.length > 0) {
+    const shown = leftoverRows.slice(0, 6).join(", ");
+    errors.push(
+      `Tidy-up only (nothing is wrong): ${leftoverRows.length} empty leftover row(s) from student(s) you removed ` +
+      `are still on this tab — row ${shown}${leftoverRows.length > 6 ? " and others" : ""}. They are ignored and ` +
+      `nobody is billed from them. Delete those rows in Excel whenever it suits you, or just leave them.`
+    );
   }
 
   // ── Identity safety checks ────────────────────────────────────────────────
