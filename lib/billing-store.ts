@@ -5,13 +5,16 @@ import { LEDGER_PATH, readJson } from "@/lib/paths";
 
 // ── Receipt ledger ────────────────────────────────────────────────────────────
 // Stored in the app config dir (not the shared folder) so deleting/moving the
-// output folder can't lose issuance history. PDPA: keyed by serial number —
-// no names or phone numbers in the ledger.
+// output folder can't lose issuance history. PDPA: keyed by Student ID (an
+// opaque generated code) — no names or phone numbers in the ledger.
 
 export interface LedgerEntry {
-  serialNo: number;
+  studentId: string;     // permanent identity, e.g. "S007"
+  /** Display-only; kept for older entries written before Student IDs existed.
+   *  Never used to match anything — serials renumber when rows are deleted. */
+  serialNo?: number;
   term: string;          // sheet name, e.g. "AY 26 T3"
-  receiptNo: string;     // deterministic, e.g. R-AY26T3-007
+  receiptNo: string;     // deterministic, e.g. R-AY26T4-S007
   amount: number;
   issuedAt: string;      // ISO — first generated
   reissuedAt: string[];  // ISO timestamps of explicit re-issues
@@ -25,12 +28,12 @@ export function termSlug(sheetName: string): string {
   return sheetName.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "TERM";
 }
 
-export function ledgerKey(sheetName: string, serialNo: number): string {
-  return `${termSlug(sheetName)}-${serialNo}`;
+export function ledgerKey(sheetName: string, studentId: string): string {
+  return `${termSlug(sheetName)}-${studentId.toUpperCase()}`;
 }
 
-export function receiptNo(sheetName: string, serialNo: number): string {
-  return `R-${termSlug(sheetName)}-${String(serialNo).padStart(3, "0")}`;
+export function receiptNo(sheetName: string, studentId: string): string {
+  return `R-${termSlug(sheetName)}-${studentId.toUpperCase()}`;
 }
 
 export function readLedger(): Ledger {

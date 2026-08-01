@@ -38,6 +38,12 @@ function isInvoiceIssued(s: Student): boolean {
   return v !== "" && v !== "no" && v !== "n" && v !== "false" && v !== "0";
 }
 
+/** Stable per-child key for React keys and lookups. Falls back to the serial
+ *  for the brief window before a new child has been assigned a Student ID. */
+function sKey(s: Student): string {
+  return s.studentId || `#${s.serialNo}`;
+}
+
 const STATUS_CFG = {
   pending:  { label: "Pending",  bg: "bg-gray-100",    text: "text-gray-500",  dot: "bg-gray-400"   },
   approved: { label: "Approved", bg: "bg-green-50",    text: "text-green-700", dot: "bg-green-500"  },
@@ -52,18 +58,20 @@ export default function InvoicesPage() {
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
   const [exportFolder, setExportFolder] = useState<string | null>(null);
-  const urlCache = useRef<Record<number, string>>({});
+  const [sheetIssues, setSheetIssues] = useState<string[]>([]);
+  const urlCache = useRef<Record<string, string>>({});
 
   /** Apply freshly-loaded students, keeping each row's in-progress review
    *  state (approved/flagged/preview) if that student was already on screen —
    *  a refresh should pick up sheet changes like Invoice Issued being
    *  cleared, not throw away work the admin already did this session. */
-  function applyStudents(students: Student[], sheet: string) {
+  function applyStudents(students: Student[], sheet: string, issues: string[] = []) {
     setSheetName(sheet);
+    setSheetIssues(issues);
     setRows((prev) => {
-      const prevByserial = new Map(prev.map((r) => [r.student.serialNo, r]));
+      const prevByKey = new Map(prev.map((r) => [sKey(r.student), r]));
       return students.map((s) => {
-        const old = prevByserial.get(s.serialNo);
+        const old = prevByKey.get(sKey(s));
         return old
           ? { ...old, student: s }
           : { student: s, status: "pending" as ApprovalStatus, flagNote: "", previewUrl: null, previewLoading: false };
@@ -87,7 +95,7 @@ export default function InvoicesPage() {
       const res = await fetch(url);
       if (res.ok) {
         const data = (await res.json()) as ParseResult;
-        applyStudents(data.students, data.sheetName);
+        applyStudents(data.students, data.sheetName, data.errors ?? []);
         sessionStorage.setItem("accel_students", JSON.stringify(data.students));
         sessionStorage.setItem("accel_sheet", data.sheetName);
         return;
@@ -111,7 +119,7 @@ export default function InvoicesPage() {
 
   async function generatePreview(idx: number) {
     const row = rows[idx];
-    const key = row.student.serialNo;
+    const key = sKey(row.student);
 
     // Use cached URL if available
     if (urlCache.current[key]) {
@@ -174,14 +182,29 @@ export default function InvoicesPage() {
     });
   }
 
+  /** IDs appearing on more than one child. Exporting either would give both
+   *  children the SAME invoice number, so those rows can't be approved until
+   *  the duplicate is fixed on Master. */
+  const dupIds = (() => {
+    const count = new Map<string, number>();
+    for (const r of rows) if (r.student.studentId) count.set(r.student.studentId, (count.get(r.student.studentId) ?? 0) + 1);
+    return new Set([...count.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+  })();
+
+  function isBlocked(s: Student): boolean {
+    return !!s.studentId && dupIds.has(s.studentId);
+  }
+
   function approveAll() {
     setRows((prev) => prev.map((r) =>
-      isBilledThisTerm(r.student) && r.status !== "flagged" ? { ...r, status: "approved" } : r
+      isBilledThisTerm(r.student) && r.status !== "flagged" && !isBlocked(r.student) ? { ...r, status: "approved" } : r
     ));
   }
 
   async function exportToFolder() {
-    const approved = rows.filter((r) => r.status === "approved" && isBilledThisTerm(r.student)).map((r) => r.student);
+    const approved = rows
+      .filter((r) => r.status === "approved" && isBilledThisTerm(r.student) && !isBlocked(r.student))
+      .map((r) => r.student);
     if (approved.length === 0) return;
     setExporting(true);
     setExportMsg(null);
@@ -202,10 +225,11 @@ export default function InvoicesPage() {
         );
         setExportFolder(body.folder ?? null);
         // Mirror the Invoice Issued write-back into the in-memory rows so the
-        // badge flips at once; the next refresh re-syncs from the sheet.
-        const exportedSerials = new Set(approved.map((s) => s.serialNo));
+        // badge flips at once; the next refresh re-syncs the real stamp
+        // (INV-… · date) from the sheet.
+        const exportedKeys = new Set(approved.map(sKey));
         setRows((prev) => prev.map((r) =>
-          exportedSerials.has(r.student.serialNo) ? { ...r, student: { ...r.student, invoiceIssued: "Yes" } } : r
+          exportedKeys.has(sKey(r.student)) ? { ...r, student: { ...r.student, invoiceIssued: "Yes" } } : r
         ));
         // Carry data forward for the receipts phase
         sessionStorage.setItem("accel_approved", JSON.stringify(approved));
@@ -288,6 +312,18 @@ export default function InvoicesPage() {
             ))}
           </div>
 
+          {/* Sheet issues — orphan rows, missing/duplicate Student IDs, shifted
+              status stamps. Surfaced here because generating against a
+              misaligned sheet is exactly what caused the duplicate-invoice mess. */}
+          {sheetIssues.length > 0 && (
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
+              <p className="text-sm font-semibold text-amber-800 mb-1">⚠ Spreadsheet needs attention</p>
+              <ul className="text-xs text-amber-700 list-disc ml-4 space-y-0.5">
+                {sheetIssues.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
           {/* Hint */}
           <p className="text-xs text-gray-400">
             Preview each invoice before approving. Flag any that need correction — flagged invoices will not be sent.
@@ -299,6 +335,7 @@ export default function InvoicesPage() {
               <thead>
                 <tr style={{ backgroundColor: "#AB33DA" }} className="text-white text-xs uppercase tracking-wide">
                   <th className="px-4 py-3 text-left font-semibold">#</th>
+                  <th className="px-4 py-3 text-left font-semibold">ID</th>
                   <th className="px-4 py-3 text-left font-semibold">Student</th>
                   <th className="px-4 py-3 text-left font-semibold">Parent</th>
                   <th className="px-4 py-3 text-center font-semibold">Level</th>
@@ -318,7 +355,7 @@ export default function InvoicesPage() {
                   if (!isBilledThisTerm(row.student)) return null;
                   const cfg = STATUS_CFG[row.status];
                   return (
-                    <Fragment key={row.student.serialNo}>
+                    <Fragment key={sKey(row.student)}>
                       <tr
                         className={`border-t border-gray-100 transition-colors ${
                           row.status === "approved" ? "bg-green-50/40"
@@ -328,6 +365,9 @@ export default function InvoicesPage() {
                         } hover:bg-purple-50/30`}
                       >
                         <td className="px-4 py-3 text-gray-400 text-xs">{row.student.serialNo}</td>
+                        <td className="px-4 py-3 text-xs font-mono text-gray-500">
+                          {row.student.studentId || <span className="text-amber-500" title="No Student ID yet — close Excel and press Refresh">⚠ none</span>}
+                        </td>
                         <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{row.student.studentName}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{row.student.parentName}</td>
                         <td className="px-4 py-3 text-center">
@@ -378,6 +418,14 @@ export default function InvoicesPage() {
 
                         {/* Action buttons */}
                         <td className="px-4 py-3 text-center">
+                          {isBlocked(row.student) ? (
+                            <span
+                              className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
+                              title={`Student ID ${row.student.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh`}
+                            >
+                              ⚠ Duplicate ID
+                            </span>
+                          ) : (
                           <div className="flex items-center justify-center gap-1.5">
                             {row.status !== "approved" && (
                               <button
@@ -404,13 +452,14 @@ export default function InvoicesPage() {
                               </button>
                             )}
                           </div>
+                          )}
                         </td>
                       </tr>
 
                       {/* Flag note row — inline expansion */}
                       {row.status === "flagged" && (
                         <tr className="bg-yellow-50/60 border-t border-yellow-100">
-                          <td colSpan={10} className="px-4 pb-3 pt-1">
+                          <td colSpan={11} className="px-4 pb-3 pt-1">
                             <div className="flex items-center gap-3 ml-6">
                               <span className="text-xs text-yellow-600 font-medium whitespace-nowrap">Flag reason:</span>
                               <input
@@ -430,7 +479,7 @@ export default function InvoicesPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-200 bg-gray-50">
-                  <td colSpan={5} className="px-4 py-3 text-right font-semibold text-gray-700">Grand Total</td>
+                  <td colSpan={6} className="px-4 py-3 text-right font-semibold text-gray-700">Grand Total</td>
                   <td className="px-4 py-3 text-right font-bold text-lg" style={{ color: "#AB33DA" }}>
                     {fmtCurrency(grandTotal)}
                   </td>
@@ -455,7 +504,7 @@ export default function InvoicesPage() {
               <div className="flex flex-wrap gap-2">
                 {unbilled.map((r) => (
                   <span
-                    key={r.student.serialNo}
+                    key={sKey(r.student)}
                     className="text-xs px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-500"
                   >
                     {r.student.studentName}

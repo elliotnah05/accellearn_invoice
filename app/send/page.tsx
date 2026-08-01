@@ -14,6 +14,11 @@ function maskPoc(poc: string): string {
 
 type SendState = "ready" | "sending" | "sent" | "failed";
 
+/** Stable per-child key — Student ID, or serial as a last-resort fallback. */
+function sKey(s: { studentId?: string; serialNo: number }): string {
+  return s.studentId || `#${s.serialNo}`;
+}
+
 interface SendStatus {
   state: SendState;
   error?: string;
@@ -33,7 +38,7 @@ export default function SendPage() {
   const [students, setStudents]   = useState<Student[]>([]);
   const [sheetName, setSheetName] = useState("");
   const [api, setApi]             = useState<ApiStatus | null>(null);
-  const [statuses, setStatuses]   = useState<Record<number, SendStatus>>({});
+  const [statuses, setStatuses]   = useState<Record<string, SendStatus>>({});
   const [bulkRunning, setBulkRunning] = useState(false);
   const statusesRef = useRef(statuses);
   statusesRef.current = statuses;
@@ -47,9 +52,9 @@ export default function SendPage() {
       if (sheet) setSheetName(sheet);
       if (saved) {
         // Restore, but downgrade any interrupted "sending" back to ready
-        const parsed = JSON.parse(saved) as Record<number, SendStatus>;
+        const parsed = JSON.parse(saved) as Record<string, SendStatus>;
         for (const k of Object.keys(parsed)) {
-          if (parsed[+k].state === "sending") parsed[+k] = { state: "ready" };
+          if (parsed[k].state === "sending") parsed[k] = { state: "ready" };
         }
         setStatuses(parsed);
       }
@@ -61,16 +66,16 @@ export default function SendPage() {
       .catch(() => setApi({ configured: false, templateMode: false, templateName: null }));
   }, []);
 
-  function updateStatus(serialNo: number, status: SendStatus) {
+  function updateStatus(key: string, status: SendStatus) {
     setStatuses((prev) => {
-      const next = { ...prev, [serialNo]: status };
+      const next = { ...prev, [key]: status };
       try { sessionStorage.setItem(STATUS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
   }
 
   async function sendOne(student: Student): Promise<boolean> {
-    updateStatus(student.serialNo, { state: "sending" });
+    updateStatus(sKey(student), { state: "sending" });
     try {
       const res = await fetch("/api/send", {
         method: "POST",
@@ -79,13 +84,13 @@ export default function SendPage() {
       });
       const body = await res.json();
       if (res.ok && body.ok) {
-        updateStatus(student.serialNo, { state: "sent", messageId: body.messageId, sentAt: body.sentAt });
+        updateStatus(sKey(student), { state: "sent", messageId: body.messageId, sentAt: body.sentAt });
         return true;
       }
-      updateStatus(student.serialNo, { state: "failed", error: body.error ?? "Send failed" });
+      updateStatus(sKey(student), { state: "failed", error: body.error ?? "Send failed" });
       return false;
     } catch {
-      updateStatus(student.serialNo, { state: "failed", error: "Network error — is the dev server running?" });
+      updateStatus(sKey(student), { state: "failed", error: "Network error — is the dev server running?" });
       return false;
     }
   }
@@ -93,7 +98,7 @@ export default function SendPage() {
   async function sendAll() {
     setBulkRunning(true);
     for (const s of students) {
-      const current = statusesRef.current[s.serialNo]?.state;
+      const current = statusesRef.current[sKey(s)]?.state;
       if (current === "sent" || current === "sending") continue;
       await sendOne(s);
       // Gentle pacing so we stay well under Meta rate limits
@@ -115,8 +120,8 @@ export default function SendPage() {
     );
   }
 
-  const sentCount   = students.filter((s) => statuses[s.serialNo]?.state === "sent").length;
-  const failedCount = students.filter((s) => statuses[s.serialNo]?.state === "failed").length;
+  const sentCount   = students.filter((s) => statuses[sKey(s)]?.state === "sent").length;
+  const failedCount = students.filter((s) => statuses[sKey(s)]?.state === "failed").length;
   const allDone     = sentCount === students.length;
 
   return (
@@ -171,9 +176,9 @@ export default function SendPage() {
 
           <div className="flex flex-col divide-y divide-gray-100">
             {students.map((s) => {
-              const st = statuses[s.serialNo] ?? { state: "ready" as SendState };
+              const st = statuses[sKey(s)] ?? { state: "ready" as SendState };
               return (
-                <div key={s.serialNo} className="py-2.5 flex items-center gap-3">
+                <div key={sKey(s)} className="py-2.5 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-800 text-sm">{s.studentName}</p>
                     <p className="text-xs text-gray-400">{s.parentName} · {maskPoc(s.poc)}</p>

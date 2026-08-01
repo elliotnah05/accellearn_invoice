@@ -48,7 +48,7 @@ interface GenerateBody {
 }
 interface MarkSentBody {
   action: "markSent";
-  serialNo: number;
+  studentId: string;
   term: string;
 }
 interface PreviewBody {
@@ -72,8 +72,14 @@ export async function POST(request: NextRequest) {
   // the preview is faithful, but nothing is committed to disk or the sheet.
   if (body.action === "preview") {
     const s = body.student;
-    if (!s?.studentName || !s?.serialNo) {
+    if (!s?.studentName) {
       return Response.json({ error: "Missing student data" }, { status: 400 });
+    }
+    if (!s.studentId) {
+      return Response.json(
+        { error: "This student has no Student ID yet — close the spreadsheet in Excel and press Refresh, then try again." },
+        { status: 400 }
+      );
     }
     try {
       const buffer = await renderToBuffer(
@@ -81,7 +87,7 @@ export async function POST(request: NextRequest) {
           student: s,
           logoBase64: getLogo(),
           config,
-          receiptNo: receiptNo(body.term, s.serialNo),
+          receiptNo: receiptNo(body.term, s.studentId),
           term: body.term,
           endDate: termEndDate(s, config, body.term),
           paymentDate: s.dateOfReceipt || "",
@@ -95,8 +101,8 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (err) {
-      // PDPA: log serial numbers only
-      console.error(`Receipt preview failed for serial ${s.serialNo}:`, err instanceof Error ? err.message : "unknown");
+      // PDPA: log student IDs only
+      console.error(`Receipt preview failed for ${s.studentId}:`, err instanceof Error ? err.message : "unknown");
       return Response.json({ error: "Receipt preview failed — check server logs" }, { status: 500 });
     }
   }
@@ -105,15 +111,21 @@ export async function POST(request: NextRequest) {
 
   // ── Mark a receipt as sent (manual send by admin) ──
   if (body.action === "markSent") {
-    const key = ledgerKey(body.term, body.serialNo);
+    if (!body.studentId) {
+      return Response.json(
+        { error: "This student has no Student ID yet — close the spreadsheet in Excel and press Refresh, then try again." },
+        { status: 400 }
+      );
+    }
+    const key = ledgerKey(body.term, body.studentId);
     // The local ledger may be empty on this machine even though the receipt was
     // genuinely issued (another admin's computer, or a fresh install after
     // handover). The spreadsheet is the real record and the receipt number is
     // deterministic, so rebuild the entry rather than refusing.
     const entry = ledger[key] ?? {
-      serialNo: body.serialNo,
+      studentId: body.studentId,
       term: body.term,
-      receiptNo: receiptNo(body.term, body.serialNo),
+      receiptNo: receiptNo(body.term, body.studentId),
       amount: 0,
       issuedAt: new Date().toISOString(),
       reissuedAt: [],
@@ -123,15 +135,21 @@ export async function POST(request: NextRequest) {
     entry.sentAt = new Date().toISOString();
     ledger[key] = entry;
     writeLedger(ledger);
-    const wb = await writebackReceiptSent(config, body.term, body.serialNo);
+    const wb = await writebackReceiptSent(config, body.term, body.studentId);
     return Response.json({ ok: true, entry, warning: wb.warning ?? null });
   }
 
   // ── Generate a receipt ──
   if (body.action === "generate") {
     const s = body.student;
-    if (!s?.studentName || !s?.serialNo) {
+    if (!s?.studentName) {
       return Response.json({ error: "Missing student data" }, { status: 400 });
+    }
+    if (!s.studentId) {
+      return Response.json(
+        { error: "This student has no Student ID yet — close the spreadsheet in Excel and press Refresh, then try again." },
+        { status: 400 }
+      );
     }
     if (!outputFolderExists(config)) {
       return Response.json(
@@ -140,10 +158,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const key = ledgerKey(body.term, s.serialNo);
+    const key = ledgerKey(body.term, s.studentId);
     const existing = ledger[key];
 
-    // Duplicate guard. Checks the spreadsheet (column R) as well as the local
+    // Duplicate guard. Checks the spreadsheet (column O) as well as the local
     // ledger, so the warning still fires on a machine that has never issued
     // this receipt itself — the shared Excel is what both admins have in common.
     const fromSheet = parseIssuedCell(s.receiptIssued);
@@ -154,9 +172,9 @@ export async function POST(request: NextRequest) {
           // No local record, but the sheet says it was issued. Hand back an
           // entry-shaped object; the client fills the dates in from the sheet.
           entry: existing ?? {
-            serialNo: s.serialNo,
+            studentId: s.studentId,
             term: body.term,
-            receiptNo: fromSheet?.receiptNo || receiptNo(body.term, s.serialNo),
+            receiptNo: fromSheet?.receiptNo || receiptNo(body.term, s.studentId),
             amount: s.totalFee,
             issuedAt: "",
             reissuedAt: [],
@@ -169,7 +187,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const rNo = receiptNo(body.term, s.serialNo);
+      const rNo = receiptNo(body.term, s.studentId);
       const buffer = await renderToBuffer(
         createElement(ReceiptPDF, {
           student: s,
@@ -190,7 +208,7 @@ export async function POST(request: NextRequest) {
       ledger[key] = existing
         ? { ...existing, amount: s.totalFee, file, reissuedAt: [...existing.reissuedAt, now] }
         : {
-            serialNo: s.serialNo,
+            studentId: s.studentId,
             term: body.term,
             receiptNo: rNo,
             amount: s.totalFee,
@@ -201,11 +219,11 @@ export async function POST(request: NextRequest) {
           };
       writeLedger(ledger);
 
-      const wb = await writebackReceiptIssued(config, body.term, s.serialNo, rNo);
+      const wb = await writebackReceiptIssued(config, body.term, s.studentId, rNo);
       return Response.json({ ok: true, entry: ledger[key], warning: wb.warning ?? null });
     } catch (err) {
-      // PDPA: log serial numbers only
-      console.error(`Receipt generation failed for serial ${s.serialNo}:`, err instanceof Error ? err.message : "unknown");
+      // PDPA: log student IDs only
+      console.error(`Receipt generation failed for ${s.studentId}:`, err instanceof Error ? err.message : "unknown");
       return Response.json({ error: "Receipt generation failed — check server logs" }, { status: 500 });
     }
   }

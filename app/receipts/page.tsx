@@ -23,6 +23,12 @@ function isPaid(s: Student): boolean {
   return v !== "" && v !== "no" && v !== "n" && v !== "false" && v !== "0";
 }
 
+/** Stable per-child key for React keys and lookups. Falls back to the serial
+ *  for the brief window before a new child has been assigned a Student ID. */
+function sKey(s: Student): string {
+  return s.studentId || `#${s.serialNo}`;
+}
+
 type RowStatus = "unpaid" | "ready" | "generated" | "sent";
 
 export default function ReceiptsPage() {
@@ -31,13 +37,14 @@ export default function ReceiptsPage() {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [folderOk, setFolderOk]   = useState<boolean | null>(null);
   const [outputFolder, setOutputFolder] = useState<string>("");
-  const [busy, setBusy]           = useState<Set<number>>(new Set());
+  const [busy, setBusy]           = useState<Set<string>>(new Set());
   const [bulkRunning, setBulkRunning] = useState(false);
   const [banner, setBanner]       = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
+  const [sheetIssues, setSheetIssues] = useState<string[]>([]);
   const [confirmDup, setConfirmDup] = useState<{ student: Student; entry: LedgerEntry } | null>(null);
   const [preview, setPreview]     = useState<{ url: string; name: string } | null>(null);
-  const [previewing, setPreviewing] = useState<Set<number>>(new Set());
-  const previewCache = useRef<Record<number, string>>({});
+  const [previewing, setPreviewing] = useState<Set<string>>(new Set());
+  const previewCache = useRef<Record<string, string>>({});
 
   useEffect(() => {
     loadLive();
@@ -55,6 +62,7 @@ export default function ReceiptsPage() {
         setStudents(data.students);
         setSheetName(data.sheetName);
         setSheetNames(data.sheetNames ?? []);
+        setSheetIssues(data.errors ?? []);
         sessionStorage.setItem("accel_students", JSON.stringify(data.students));
         sessionStorage.setItem("accel_sheet", data.sheetName);
         refreshFolderStatus(data.sheetName);
@@ -88,8 +96,8 @@ export default function ReceiptsPage() {
   /** Reflect a just-completed write-back in the in-memory sheet data, so the row
    *  updates instantly. The next live reload re-reads the real cells, keeping the
    *  spreadsheet authoritative. Mirrors what sheet-writeback.ts writes. */
-  function patchStudent(serialNo: number, patch: Partial<Student>) {
-    setStudents((prev) => prev.map((s) => (s.serialNo === serialNo ? { ...s, ...patch } : s)));
+  function patchStudent(key: string, patch: Partial<Student>) {
+    setStudents((prev) => prev.map((s) => (sKey(s) === key ? { ...s, ...patch } : s)));
   }
 
   function rowStatus(s: Student): RowStatus {
@@ -99,16 +107,29 @@ export default function ReceiptsPage() {
     return isPaid(s) ? "ready" : "unpaid";
   }
 
-  function setRowBusy(serialNo: number, on: boolean) {
+  /** IDs appearing on more than one child. Generating for either would give
+   *  both children the SAME receipt number, so their action buttons lock
+   *  until the duplicate is fixed on Master. */
+  const dupIds = (() => {
+    const count = new Map<string, number>();
+    for (const s of students) if (s.studentId) count.set(s.studentId, (count.get(s.studentId) ?? 0) + 1);
+    return new Set([...count.entries()].filter(([, n]) => n > 1).map(([id]) => id));
+  })();
+
+  function isBlocked(s: Student): boolean {
+    return !!s.studentId && dupIds.has(s.studentId);
+  }
+
+  function setRowBusy(key: string, on: boolean) {
     setBusy((prev) => {
       const next = new Set(prev);
-      if (on) next.add(serialNo); else next.delete(serialNo);
+      if (on) next.add(key); else next.delete(key);
       return next;
     });
   }
 
   async function generate(student: Student, force = false): Promise<boolean> {
-    setRowBusy(student.serialNo, true);
+    setRowBusy(sKey(student), true);
     try {
       const res = await fetch("/api/receipts", {
         method: "POST",
@@ -126,7 +147,7 @@ export default function ReceiptsPage() {
       }
       // Mirror the Receipt Issued write-back into the in-memory sheet so the row
       // flips to "generated" at once; the next reload re-syncs from the sheet.
-      patchStudent(student.serialNo, { receiptIssued: `${body.entry.receiptNo} · ${dmyToday()}` });
+      patchStudent(sKey(student), { receiptIssued: `${body.entry.receiptNo} · ${dmyToday()}` });
       setBanner(body.warning
         ? { kind: "warn", text: `Receipt ${body.entry.receiptNo} created, but: ${body.warning}` }
         : { kind: "ok", text: `Receipt ${body.entry.receiptNo} saved to the shared folder` });
@@ -135,17 +156,17 @@ export default function ReceiptsPage() {
       setBanner({ kind: "warn", text: "Network error — is the dev server running?" });
       return false;
     } finally {
-      setRowBusy(student.serialNo, false);
+      setRowBusy(sKey(student), false);
     }
   }
 
   async function markSent(student: Student) {
-    setRowBusy(student.serialNo, true);
+    setRowBusy(sKey(student), true);
     try {
       const res = await fetch("/api/receipts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "markSent", serialNo: student.serialNo, term: sheetName }),
+        body: JSON.stringify({ action: "markSent", studentId: student.studentId, term: sheetName }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -153,25 +174,25 @@ export default function ReceiptsPage() {
         return;
       }
       // Mirror the Receipt Sent write-back so the row flips to "sent" at once.
-      patchStudent(student.serialNo, { receiptSent: `Sent ${dmyToday()}` });
+      patchStudent(sKey(student), { receiptSent: `Sent ${dmyToday()}` });
       setBanner(body.warning
         ? { kind: "warn", text: `Marked as sent, but: ${body.warning}` }
         : { kind: "ok", text: `Marked as sent — Excel updated` });
     } catch {
       setBanner({ kind: "warn", text: "Network error — is the dev server running?" });
     } finally {
-      setRowBusy(student.serialNo, false);
+      setRowBusy(sKey(student), false);
     }
   }
 
   /** Render-only preview — never assigns a receipt number for real, never
    *  writes a file or touches the sheet. Cached per student for the session. */
   async function previewReceipt(student: Student) {
-    if (previewCache.current[student.serialNo]) {
-      setPreview({ url: previewCache.current[student.serialNo], name: student.studentName });
+    if (previewCache.current[sKey(student)]) {
+      setPreview({ url: previewCache.current[sKey(student)], name: student.studentName });
       return;
     }
-    setPreviewing((prev) => new Set(prev).add(student.serialNo));
+    setPreviewing((prev) => new Set(prev).add(sKey(student)));
     try {
       const res = await fetch("/api/receipts", {
         method: "POST",
@@ -184,14 +205,14 @@ export default function ReceiptsPage() {
       }
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
-      previewCache.current[student.serialNo] = url;
+      previewCache.current[sKey(student)] = url;
       setPreview({ url, name: student.studentName });
     } catch {
       setBanner({ kind: "warn", text: "Network error — is the dev server running?" });
     } finally {
       setPreviewing((prev) => {
         const next = new Set(prev);
-        next.delete(student.serialNo);
+        next.delete(sKey(student));
         return next;
       });
     }
@@ -210,6 +231,7 @@ export default function ReceiptsPage() {
     let done = 0;
     for (const s of students) {
       if (rowStatus(s) !== "ready") continue;   // never touches already-generated rows
+      if (isBlocked(s)) continue;               // duplicate Student ID — fix the sheet first
       if (await generate(s)) done++;
     }
     setBulkRunning(false);
@@ -286,6 +308,18 @@ export default function ReceiptsPage() {
           </div>
         )}
 
+        {/* Sheet issues — orphan rows, missing/duplicate Student IDs, shifted
+            status stamps. Generating against a misaligned sheet is what caused
+            the duplicate-invoice mess, so these get a persistent banner. */}
+        {sheetIssues.length > 0 && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
+            <p className="text-sm font-semibold text-amber-800 mb-1">⚠ Spreadsheet needs attention</p>
+            <ul className="text-xs text-amber-700 list-disc ml-4 space-y-0.5">
+              {sheetIssues.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+          </div>
+        )}
+
         {/* Status banner */}
         {banner && (
           <div className={`rounded-xl border p-4 text-sm flex items-start justify-between gap-4 ${
@@ -332,12 +366,13 @@ export default function ReceiptsPage() {
             {students.map((s) => {
               const st = rowStatus(s);
               const rs = stateFor(s);
-              const isBusy = busy.has(s.serialNo);
+              const isBusy = busy.has(sKey(s));
               return (
-                <div key={s.serialNo} className="py-3 flex items-center gap-4">
+                <div key={sKey(s)} className="py-3 flex items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-800 text-sm">{s.studentName}</p>
                     <p className="text-xs text-gray-400">
+                      {s.studentId && <span className="font-mono text-gray-500">{s.studentId} · </span>}
                       {s.parentName} · {subjectsText(s)} ({s.level})
                       {s.dateOfReceipt && <span> · paid {s.dateOfReceipt}</span>}
                       {rs?.receiptNo && <span className="text-gray-500 font-mono"> · {rs.receiptNo}</span>}
@@ -365,41 +400,52 @@ export default function ReceiptsPage() {
                   <div className="w-72 flex justify-end gap-2 shrink-0">
                     <button
                       onClick={() => previewReceipt(s)}
-                      disabled={previewing.has(s.serialNo)}
+                      disabled={previewing.has(sKey(s))}
                       className="text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-40"
                       style={{ borderColor: "#AB33DA", color: "#AB33DA" }}
                       title="See exactly what this receipt will look like — nothing is saved or issued"
                     >
-                      {previewing.has(s.serialNo) ? "Loading…" : "Preview"}
+                      {previewing.has(sKey(s)) ? "Loading…" : "Preview"}
                     </button>
-                    {st === "ready" && (
-                      <button
-                        onClick={() => generate(s)}
-                        disabled={isBusy || bulkRunning || folderOk === false}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-40"
-                        style={{ backgroundColor: "#AB33DA" }}
+                    {isBlocked(s) ? (
+                      <span
+                        className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
+                        title={`Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh`}
                       >
-                        {isBusy ? "Generating…" : "Generate Receipt"}
-                      </button>
-                    )}
-                    {st === "generated" && (
-                      <button
-                        onClick={() => markSent(s)}
-                        disabled={isBusy}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-40"
-                      >
-                        Mark as Sent
-                      </button>
-                    )}
-                    {(st === "generated" || st === "sent") && (
-                      <button
-                        onClick={() => generate(s)}
-                        disabled={isBusy || bulkRunning}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40"
-                        title="Re-create this receipt (asks for confirmation)"
-                      >
-                        Re-generate
-                      </button>
+                        ⚠ Duplicate ID
+                      </span>
+                    ) : (
+                      <>
+                        {st === "ready" && (
+                          <button
+                            onClick={() => generate(s)}
+                            disabled={isBusy || bulkRunning || folderOk === false}
+                            className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-40"
+                            style={{ backgroundColor: "#AB33DA" }}
+                          >
+                            {isBusy ? "Generating…" : "Generate Receipt"}
+                          </button>
+                        )}
+                        {st === "generated" && (
+                          <button
+                            onClick={() => markSent(s)}
+                            disabled={isBusy}
+                            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-40"
+                          >
+                            Mark as Sent
+                          </button>
+                        )}
+                        {(st === "generated" || st === "sent") && (
+                          <button
+                            onClick={() => generate(s)}
+                            disabled={isBusy || bulkRunning}
+                            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40"
+                            title="Re-create this receipt (asks for confirmation)"
+                          >
+                            Re-generate
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

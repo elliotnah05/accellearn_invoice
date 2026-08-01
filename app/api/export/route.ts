@@ -46,32 +46,39 @@ export async function POST(request: NextRequest) {
   const dir = ensureOutputDir(config, "Invoices", body.term)!;
   const slug = termSlug(body.term);
   const written: string[] = [];
-  const writtenSerials: number[] = [];
-  const failed: number[] = [];
+  const stamps: { studentId: string; invNo: string }[] = [];
+  const failed: string[] = [];
 
   for (const s of body.students) {
+    // A child with no permanent ID can't be exported: the invoice number and
+    // the Invoice Issued stamp would have nothing stable to hang on to.
+    if (!s.studentId) {
+      failed.push(`serial ${s.serialNo} (no Student ID — refresh the list with Excel closed)`);
+      continue;
+    }
     try {
       const buffer = await renderToBuffer(
         createElement(InvoicePDF, { student: s, logoBase64: getLogo(), config }) as unknown as ReactElement<DocumentProps>
       );
-      const invNo = `INV-${slug}-${String(s.serialNo).padStart(3, "0")}`;
+      const invNo = `INV-${slug}-${s.studentId.toUpperCase()}`;
       const file = path.join(dir, `Invoice_${invNo}_${safeFileName(s.studentName)}.pdf`);
       writeFileSync(file, buffer);
       written.push(invNo);
-      writtenSerials.push(s.serialNo);
+      stamps.push({ studentId: s.studentId, invNo });
     } catch (err) {
-      // PDPA: serial numbers only in logs
-      console.error(`Invoice export failed for serial ${s.serialNo}:`, err instanceof Error ? err.message : "unknown");
-      failed.push(s.serialNo);
+      // PDPA: student IDs only in logs
+      console.error(`Invoice export failed for ${s.studentId}:`, err instanceof Error ? err.message : "unknown");
+      failed.push(s.studentId);
     }
   }
 
-  // Stamp "Yes" into Invoice Issued for every student actually written. One
-  // workbook open/save for the whole batch — best-effort, so a spreadsheet
-  // that's open in Excel doesn't fail the export itself, just surfaces a warning.
+  // Stamp "INV-… · date" into Invoice Issued for every student actually
+  // written. One workbook open/save for the whole batch — best-effort, so a
+  // spreadsheet that's open in Excel doesn't fail the export itself, just
+  // surfaces a warning.
   let warning: string | null = null;
-  if (writtenSerials.length > 0) {
-    const wb = await writebackInvoiceIssued(config, body.term, writtenSerials);
+  if (stamps.length > 0) {
+    const wb = await writebackInvoiceIssued(config, body.term, stamps);
     warning = wb.warning ?? null;
   }
 

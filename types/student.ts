@@ -17,6 +17,13 @@ export interface SubjectLine {
 
 /** A child = one invoice = one receipt. Grouped from Excel rows sharing a Serial No. */
 export interface Student {
+  /** Permanent identity (e.g. "S007"), from the Student ID column. Assigned once,
+   *  never reused, survives row deletion/renumbering. Everything that must match
+   *  a child across time — ledger keys, receipt/invoice numbers, Excel write-back
+   *  — keys on this. Empty string until the app assigns one (new Master row). */
+  studentId: string;
+  /** Positional display number from column A. Renumbers when rows are added or
+   *  removed, so it must never be used to identify a child — cosmetic only. */
   serialNo: number;
   studentName: string;
   parentName: string;
@@ -66,4 +73,20 @@ export function lessonsText(s: Student): string {
 
 export function subjectsText(s: Student): string {
   return s.subjects.map((l) => l.subject).filter(Boolean).join(", ");
+}
+
+/** One canonical spelling for a Student ID, so a hand-edited "s7" or "S07 "
+ *  still matches the "S007" in stamps, ledger keys and receipt numbers.
+ *  App-format IDs are padded to 3+ digits; anything else (including empty)
+ *  is just trimmed/uppercased so it can still be flagged by validation. */
+export function normalizeStudentId(id: string): string {
+  const s = (id ?? "").trim().toUpperCase();
+  const m = s.match(/^S0*(\d+)$/);
+  return m ? `S${m[1].padStart(3, "0")}` : s;
+}
+
+/** True for IDs the app itself would assign (S001, S002 …). Anything else was
+ *  typed by hand and deserves a warning before it gets baked into documents. */
+export function isAppStudentId(id: string): boolean {
+  return /^S\d{3,}$/.test(normalizeStudentId(id));
 }

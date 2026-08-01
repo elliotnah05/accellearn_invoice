@@ -1,7 +1,7 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 26 July 2026 (v0.11.2)
+**Last updated:** 1 August 2026 (v0.12.0)
 **Who it's for:** The centre owner and any admin who runs billing. Keep this file in the shared Google Drive folder and hand it to every new admin. New to the app? Read sections 1–4 in order. A short version history is at the very end.
 
 ---
@@ -105,7 +105,7 @@ One row per **subject**. A child with two subjects has two rows, A–E merged ac
 
 | Col | Field | Example | Notes |
 |---|---|---|---|
-| A | Serial No | `15` | **Unique per child.** Never reuse |
+| A | Serial No | `15` | Display only — renumbers itself when rows change. Nothing depends on it |
 | B | Student Name | `Jayden Tan` | Child's **first** row only |
 | C | Parent Name | `Mrs Tan` | Printed on invoice & receipt |
 | D | School | `Raffles Institution` | Admin reference only — not printed anywhere, no logic reads it |
@@ -113,8 +113,9 @@ One row per **subject**. A child with two subjects has two rows, A–E merged ac
 | F | Subject | `Mathematics` | One per row |
 | G | Duration (hrs) | `2` | Blank = 2 |
 | H | Rate/hr ($) | `55` | Number only. **Required** |
+| I | Student ID | `S015` | **App writes this — leave it alone.** The child's permanent code: it never changes and is never given to anyone else, even after they leave. It's what ties a child to their invoices and receipts (the serial number can't — it renumbers). It appears on invoice/receipt numbers and PDF filenames so you can cross-check |
 
-Add a student = type them into the next free Master row (linked down to **row 500**).
+Add a student = type them into the next free Master row (linked down to **row 1000**). Their Student ID appears by itself the next time the app refreshes (spreadsheet closed in Excel).
 
 ### Term tab — columns I–R
 
@@ -125,13 +126,14 @@ A–H are formulas from Master. Fill in I–R for the term:
 | I | Lessons | `12` | **Blank = 12.** A number bills that many (`6` for a mid-term joiner). **`0` = not enrolled this term** (skipped from the run) |
 | J | Material Fee ($) | `-80` or `90` | One figure, ± . Minus discounts, plain number adds. Prints as one "Material Fee" line. Blank/`0` = none |
 | K | Material Fee Notes | `2 lessons missed` | **Internal only — never printed.** Your reminder of why J is what it is |
-| L | Invoice Issued | *app writes* | `Yes` — stamped automatically the moment the app exports that child's invoice to the shared folder. **Two-way**, like Receipt Issued: clear the cell in Excel, save, and **⟳ Refresh** on the invoice review screen shows it as not-issued again |
+| L | Invoice Issued | *app writes* | `INV-AY26T4-S015 · 01/08/26` — stamped automatically the moment the app exports that child's invoice to the shared folder (the stamp carries their Student ID, so the app can spot a mark that's drifted onto the wrong row). **Two-way**, like Receipt Issued: clear the cell in Excel, save, and **⟳ Refresh** on the invoice review screen shows it as not-issued again |
 | M | Paid | `yes` / `PayNow` / `13/7/26` | Anything except empty/no = paid — see **Paid rule** |
 | N | Date of Receipt | `13/7/26` | **Prints on the receipt** ("received a payment … on 13/07/26") |
 | O | Receipt Issued | *app writes* | `R-AY26T3-015 · 14/07/26`; red (issued) → green (sent). Clear it to cancel — see §8 |
 | P | Different End Date | `2/8/26` | Only if a child ends early/late — **prints as their term-end on the receipt** |
 | Q | Backed Up | `yes` | Your own tracking |
 | R | Receipt Sent | *app writes* | `Sent 14/07/26`. Clear it to un-send — see §8 |
+| S | Student ID | *auto* | Mirrors Master's column I by formula, like A–H. **Leave it alone** |
 
 ### How a bill is worked out
 
@@ -186,14 +188,46 @@ So `yes`, `PayNow`, `13/7/26` all mean paid. ⚠️ **The trap:** words like `pe
 - **Back up before big edits** (copy the file, add the date to the name).
 - **Never delete/rename `Master` or move it off the front** — every term tab reads it by name.
 - **Never insert, delete, or reorder a column** — the app finds each field by its position, so a shifted column breaks everything. Retype a wrong heading; don't move the column.
+- **Never sort or rearrange rows on Master.** The name columns on term tabs would move but each term's lessons/fees/receipt marks would stay put — attached to the wrong children. The app detects this and warns; if you see that warning, close without saving or restore the previous version from Drive (right-click the file → Version history).
+- **Add new students at the BOTTOM of Master, never insert a row in the middle.** A middle insert makes the new student invisible on the term tabs (the app will warn you they're "not appearing").
+- **Don't type, copy-drag, or edit Student IDs (Master column I / term column S).** The app assigns them. The one exception: re-adding a returning student with the same ID they had before (§5).
 - Keep the file under **10 MB** (normal use is far below).
+
+### Safeguards — what the app checks, and what only you can prevent
+
+Every student has a permanent **Student ID** (Master column I, mirrored to term column S). It is assigned by the app, never changes, and is never given to anyone else. It is what ties a student to their invoices and receipts, which is why students can be added or removed freely without disturbing anyone else's records.
+
+**Checks the app runs for you.** Each time you press **⟳ Refresh** (or open the invoice/receipt screens), the spreadsheet is inspected. Anything below appears as a yellow **"Spreadsheet needs attention"** panel naming the exact student or row:
+
+| Situation | What you'll see |
+|---|---|
+| A new student has no Student ID yet | Assigned automatically. If the file is open in Excel, you're asked to close it and refresh |
+| A Student ID cleared by accident | Recovered automatically from that student's existing invoice/receipt marks |
+| The same Student ID on two students | Both are named, and their **Generate** / **Approve** buttons lock until it's corrected |
+| A status mark sitting beside the wrong student (rows shifted) | Named, with a prompt to restore the file before generating anything |
+| A student on Master not appearing on the term tab | Named, so they aren't silently left unbilled |
+| Marks copied from a previous term onto a new tab | The tab is named, with a reminder to clear columns I–R |
+| The order of students changed since the last refresh | Flagged as a possible accidental sort, with recovery instructions |
+| A leftover row from a deleted student (`#REF!`, or marks with no student) | The row number is given so it can be removed |
+
+**Responsibilities the app cannot take over.** These change the meaning of the data itself, so no automatic check can decide the right outcome — please follow them as standing practice:
+
+1. **Do not sort or reorder rows on Master.** Names on term tabs would move while each term's lessons, fees and receipt marks stay in place. The app will warn you, but the fix is manual — restore the previous version of the file (in Google Drive: right-click the file → **Version history**).
+2. **Add new students at the bottom of Master.** Inserting a row in the middle leaves the new student invisible on the term tabs.
+3. **Leave the Student ID columns alone** (Master **I**, term **S**). Never type, autofill or copy-drag them. The single exception is re-adding a returning student with the ID they had before.
+4. **Clear columns I–R when you create a term tab by copying another one.**
+5. **Freeze a term once it is finished** (§5) — otherwise a later change to a rate on Master would rewrite that term's completed figures.
+6. **One person edits the spreadsheet at a time.** It lives in a shared Drive folder; if two people save at once, the later save wins and the earlier edits are lost.
+7. **Check that Drive has finished syncing** before and after a billing run, so every admin is working from the same file.
+
+If a warning ever appears that you don't understand, the safe response is the same: **don't generate anything, and restore the file's previous version from Drive version history.** Documents already saved in the shared folder are never affected by this.
 
 ---
 
 ## 5. Common tasks
 
 ### Add a new student (30 seconds)
-Master tab → next free row → Serial, Name, Parent, School, Level, Subject, Duration, Rate → Save. Two subjects? Add a second row, leave the name blank, merge A–E. They appear on every term tab automatically — go to the term and set their **Lessons (I)**.
+Master tab → next free row → Name, Parent, School, Level, Subject, Duration, Rate → Save. (Serial No fills itself in; the app assigns their **Student ID** on the next refresh.) Two subjects? Add a second row, leave the name blank, merge A–E. They appear on every term tab automatically — go to the term and set their **Lessons (I)**.
 
 ### A student who joins or leaves mid-term
 Master stays the full roster; each term's **Lessons (I)** decides who's billed and how much:
@@ -203,16 +237,23 @@ Master stays the full roster; each term's **Lessons (I)** decides who's billed a
 
 Remember: **blank = 12, `0` = not billed, any number = that many.**
 
+### A student who leaves for good (delete their row)
+1. **Finish their paperwork first** — their last invoice is already out; if a final payment comes in, mark it Paid and generate their receipt as normal. The app can only generate documents for students still on the sheet.
+2. **Delete their row(s)** — on **Master** and on the term tabs (right-click the row number → Delete; a two-subject child has two rows). The serial numbers close up by themselves.
+3. That's it. Nobody else's records move: every other child keeps their Student ID, so all invoices, receipts and stamps stay attached to the right people. The leaver's PDFs stay safely in the shared Drive folder, and their ID is never given to anyone else.
+4. **Forgot a row somewhere?** The app notices (a leftover row with marks but no student, or a broken `#REF!` row) and shows a yellow "Spreadsheet needs attention" banner telling you exactly which row to delete.
+5. **Deleted too soon and need their invoice again?** Usually the PDF in the Drive folder *is* the record. If it's truly lost: re-add their row on Master and type their **old Student ID** into column I by hand (it's in the PDF filename), generate, then delete again.
+
 ### Start a new term
 Most terms already exist as blank tabs. To start one:
 1. Pick it in the **Term sheet dropdown** (optionally drag its tab right after Master to make it the default).
 2. Leave A–H alone; fill in **Lessons (I)** (+ Material Fee) for each child.
 3. Update **Settings → Clause 2 Term Schedule** so invoices print the right dates.
 
-Need a brand-new tab (e.g. `AY 27 T1`)? Right-click a term tab → **Move or Copy → Create a copy**, rename it (keep the `AY <yy> T<n>` shape), **clear columns I–R**, then follow the steps above.
+Need a brand-new tab (e.g. `AY 27 T1`)? Right-click a term tab → **Move or Copy → Create a copy**, rename it (keep the `AY <yy> T<n>` shape), **clear columns I–R**, then follow the steps above. (Forgot to clear? The app notices — the copied marks name their old term — and tells you which tab to clean.)
 
 ### Close a finished term ("freeze" it)
-A–H on a term tab are live links to Master, so a future rate change would rewrite an old term's fees. Freeze a term once it's fully done: select **A2:H500** → **Copy** → **Paste Special → Values** → Save. It looks identical but no longer changes with Master. Only freeze terms that are over.
+A–H (and Student ID in S) on a term tab are live links to Master, so a future rate change would rewrite an old term's fees. Freeze a term once it's fully done: select **A2:H1000** → **Copy** → **Paste Special → Values**, do the same for **S2:S1000**, then Save. It looks identical but no longer changes with Master. Only freeze terms that are over.
 
 ---
 
@@ -257,7 +298,13 @@ The spreadsheet and PDFs hold personal data of **minors** and their parents. Sin
 | Invoice Issued (L) didn't get stamped | The app only writes it when you **Export to Folder** from the invoice review screen — previewing or downloading a single PDF doesn't touch the sheet. If it still shows blank after exporting, the sheet was probably open in Excel at that moment (check the banner on the export screen); close Excel and export again. |
 | Cleared Invoice Issued in Excel but the app still shows it issued | Save in Excel (Ctrl+S), then click **⟳ Refresh** on the invoice review screen — same as receipts, edits aren't visible until the file is saved and the app re-reads it. |
 | A term tab shows a formula / `0` where a name should be | A–H are linked to Master — edit **Master**. A `0` means the link lost its blank-check; the cell should read `=IF(Master!B2="","",Master!B2)`. |
-| A student added to Master isn't on the term tab | Confirm it's on **Master**, at or above **row 500**, and the file is **saved**. Below row 500? Copy a row down to extend the links. |
+| A student added to Master isn't on the term tab | Confirm they're on **Master**, at or above **row 1000**, and the file is **saved**. Most often the row was inserted in the *middle* of Master — move them to the bottom instead. |
+| Yellow "Spreadsheet needs attention" panel | Read the lines in it — each names the exact student or row and the fix. See §4, *Safeguards*. Don't generate documents until it's cleared. |
+| "This student has no Student ID yet" | The spreadsheet was open in Excel when the app tried to assign one. Close Excel, click **⟳ Refresh**, and the ID appears. |
+| Red **⚠ Duplicate ID** on a student's row | Two students share a Student ID (usually from copy-dragging column I). On **Master**, clear the ID of the student who was added later, save, close Excel, then **⟳ Refresh** — a fresh ID is assigned and the buttons unlock. |
+| "The ORDER of students changed" warning | Rows were sorted or moved on Master. If it wasn't deliberate, restore the previous version (Drive → right-click the file → **Version history**). If it was deliberate, refresh once more and the notice clears. |
+| "…mark is from AY26T4, not AY27T1" | A term tab was copied from a finished term without clearing it. Select **I2:R1000** on the new tab, delete, save. |
+| A returning student needs their old records back | Re-add them at the bottom of Master and type their **previous Student ID** into column I by hand — it's in their old invoice/receipt filenames. |
 | An old term's fees changed by themselves | It was never frozen — freeze finished terms (§5). |
 | App billing the wrong term | Pick the right one in the **Term sheet dropdown**. |
 | A date shows as a number (`46216`) | Outdated app — install the current one. |
@@ -270,7 +317,7 @@ Admins can ignore this section.
 
 - **Installers:** GitHub Actions builds Win (NSIS `.exe`) + Mac (universal `.dmg`, unsigned) on every pushed tag (`git tag v0.x.y && git push origin v0.x.y`) and attaches them to one Release (~10–15 min). Keep `package.json` version in step with the tag. Stable links: `…/releases/latest/download/AccelLearn-Invoices-Setup.exe` and `…/AccelLearn-Invoices.dmg`. Local build: `npm run build && npm run dist` in `app/`.
 - **Source:** repo `accellearn_invoice` (scoped to `app/`), Next.js 16 + Electron. Per-machine config: `%APPDATA%\app\data\template.json` (prefer the in-app Settings).
-- **Workbook shape:** tab 1 `Master` (A–H, typed once); each following tab is a term pulling A–H via `=IF(Master!A2="","",Master!A2)` down to row 500. Deliberately not IFERROR (a blank isn't an error) and no spill formulas (they don't survive a script write + reopen). Nothing is locked.
+- **Workbook shape:** tab 1 `Master` (A–H typed once, **I = Student ID** written by the app); each following tab is a term pulling A–H via `=IF(Master!A2="","",Master!A2)` and **S** via `=IF(Master!I2="","",Master!I2)`, down to row 1000. Deliberately not IFERROR (a blank isn't an error) and no spill formulas (they don't survive a script write + reopen). Nothing is locked.
 - **Sheet selection & term picker:** defaults to the first non-Master tab (`activeTermSheet()`); the Import/Receipts dropdowns list `listTermSheets()` and pass the choice as `GET /api/students?sheet=<name>`. `parseWorkbook(buffer, requestedSheet?)` only honours a real non-Master tab (so Master is never billed). The response includes `sheetNames`.
 - **Lessons / not-billed:** `numValOr(row, col, 12)` — blank → 12, typed `0` stays 0. The review page excludes `totalFee === 0 && totalLessons === 0` (`isBilledThisTerm`) into the "Not billed" panel.
 - **Cached formula values:** the app reads Excel's *cached* results, so a script-written workbook must be opened + saved in Excel once (normal editing does this). `sheet-writeback.ts` resolves `{formula, result}` cells when matching serials.
@@ -282,6 +329,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.12.0** — **Permanent Student IDs.** Every child gets a code (`S001`, `S002`…) in Master column I, assigned by the app automatically and **never reused**. All matching — invoice numbers, receipt numbers, the marks written into columns L/O/R — now keys on this ID instead of the serial number, so **deleting or reordering students can no longer shift anyone's invoice/receipt history** (the bug where a deletion made the app re-issue invoices for everyone below). Serial No is now display-only. Invoice Issued stamps changed from `Yes` to `INV-… · date` so every mark identifies its child; the app detects and warns about marks sitting on the wrong row, leftover rows from deletions, and missing/duplicate IDs. Term-tab links to Master extended from row 500 to **row 1000** (the whole formatted sheet). Also added: automatic checks each refresh for duplicate IDs, marks sitting beside the wrong student, students missing from a term tab, marks copied from another term, and accidental re-sorting of Master — each shown as a "Spreadsheet needs attention" panel naming the student or row (§4, *Safeguards*). One-time upgrade: `node scripts/add-student-ids.js "<workbook.xlsx>"` (makes a backup, IDs all current students, audits for leftover deletion damage).
 - **v0.11.2** — **Status page now reads everything from the spreadsheet** (it previously read receipts from a file stored on your own computer, so a new admin's Status page showed zero receipts while the Receipts page correctly showed them). Added an **Invoices issued** tile and column.
 - **v0.11.1** — Invoice Issued (column L) is now **two-way** with Excel, matching Receipt Issued: the invoice review screen reads it live and gained a **⟳ Refresh** button + an **Issued** status column, so clearing the cell in Excel and refreshing un-marks it in the app too (previously write-only).
 - **v0.11.0** — Column **D** relabelled **POC → School** (admin reference only, phone masking removed); **Adjustment (J/K) → Material Fee**, including the invoice PDF line item; **Invoice Issued (L)** is now stamped **"Yes"** automatically when invoices are exported to the shared folder (previously never written).

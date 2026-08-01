@@ -1,5 +1,8 @@
 import * as XLSX from "xlsx";
-import { recalcStudent, type ParseResult, type Student, type SubjectLine } from "@/types/student";
+import {
+  normalizeStudentId, isAppStudentId, recalcStudent,
+  type ParseResult, type Student, type SubjectLine,
+} from "@/types/student";
 
 // Column index map (0-based) matching "student details LATEST.xlsx" (A–R).
 // One row per SUBJECT; rows sharing a Serial No are one child → one invoice.
@@ -25,6 +28,7 @@ const COL = {
   differentEndDate:15,  // P
   backedUp:        16,  // Q
   receiptSent:     17,  // R
+  studentId:       18,  // S — permanent ID, formula-linked to Master column I
 } as const;
 
 type Row = (string | number | boolean | null | undefined)[];
@@ -78,6 +82,29 @@ export function isMasterSheet(name: string): boolean {
   return name.trim().toLowerCase() === MASTER_SHEET.toLowerCase();
 }
 
+/** A broken identity cell (#REF!/#N/A etc.) means this row's formula link to
+ *  Master was severed — the classic leftover of a deleted Master row. Excel
+ *  errors reach us as their display text. */
+function isErrorText(s: string): boolean {
+  return /^#(REF|N\/A|VALUE|NAME|DIV\/0|NULL|NUM)[!?]?$/i.test(s.trim());
+}
+
+/** "INV-AY26T4-S007 · 01/08/26" or "R-AY26T4-S007 · 14/07/26" → the stamp's
+ *  term slug and Student ID. Stamps written by the app carry both, which lets
+ *  us verify a status cell still sits on the row of the child it was issued to
+ *  AND on the term tab it was issued for. Null for stamps without an ID (e.g.
+ *  a plain "Yes" or hand-typed text). */
+function stampInfo(cellText: string): { slug: string; studentId: string } | null {
+  const m = cellText.match(/\b(?:INV|R)-([A-Z0-9]+)-(S\d+)\b/i);
+  return m ? { slug: m[1].toUpperCase(), studentId: normalizeStudentId(m[2]) } : null;
+}
+
+/** Same slug rule as billing-store's termSlug (kept inline — billing-store
+ *  pulls in fs, which this parser must stay free of). */
+function sheetSlug(name: string): string {
+  return name.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "TERM";
+}
+
 /** First tab that isn't Master; falls back to the first tab for older
  *  single-sheet workbooks that have no Master at all. */
 export function activeTermSheet(names: string[]): string {
@@ -93,6 +120,24 @@ export function listTermSheets(names: string[]): string[] {
   return terms.length ? terms : names;
 }
 
+/** Did the RELATIVE ORDER of students change between two refreshes?
+ *
+ *  Deleting or adding students keeps everyone else's order — but sorting (or
+ *  cutting-and-pasting rows around) on Master reshuffles which student each
+ *  term-tab row mirrors while the term data stays put, silently attaching
+ *  lessons/fees/statuses to the wrong children. Stamped rows get caught by the
+ *  stamp checks; this catches the sort itself, stamps or not. Compares only
+ *  IDs present in both lists, so normal add/remove churn never trips it. */
+export function idOrderChanged(prevIds: string[], currIds: string[]): boolean {
+  const currSet = new Set(currIds);
+  const prevSet = new Set(prevIds);
+  if (currSet.size !== currIds.length) return false; // duplicate IDs — other checks own this
+  const prevCommon = prevIds.filter((id) => currSet.has(id));
+  const currCommon = currIds.filter((id) => prevSet.has(id));
+  if (prevCommon.length < 2) return false;
+  return prevCommon.join("\n") !== currCommon.join("\n");
+}
+
 /** Parse one term tab. `requestedSheet` picks a specific tab (e.g. from the
  *  term dropdown); it is only honoured when it's a real, non-Master tab —
  *  otherwise we fall back to the active term. Master is never parsed for
@@ -105,6 +150,8 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
       ? requestedSheet
       : activeTermSheet(wb.SheetNames);
   const ws = wb.Sheets[sheetName];
+  const masterName = wb.SheetNames.find(isMasterSheet);
+  const mastersheet = masterName ? wb.Sheets[masterName] : undefined;
 
   const raw = XLSX.utils.sheet_to_json<Row>(ws, {
     header: 1,
@@ -115,6 +162,7 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
   const errors: string[] = [];
   const students: Student[] = [];
   const seenSerials = new Set<number>();
+  const seenIds = new Map<string, string>(); // studentId → first student name using it
 
   // Build the subject line for a data row.
   function buildLine(row: Row, rowNum: number, name: string): SubjectLine {
@@ -153,6 +201,18 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
 
     const studentName = cellVal(row, COL.studentName);
 
+    // ── Leftover of a deleted Master row: identity formulas broken (#REF!) but
+    // the static status columns still hold the deleted child's data. Surface it
+    // for cleanup rather than mis-attaching that data to a neighbour. ──
+    if (isErrorText(studentName)) {
+      errors.push(
+        `Row ${i + 1}: broken link to Master (${studentName}) — this looks like a leftover row from a ` +
+        `deleted student. Delete this row on this tab (right-click the row number → Delete).`
+      );
+      current = null; // whatever follows must not attach to the deleted child
+      continue;
+    }
+
     // ── Continuation row (merged/blank Student Name) = another subject for the child above ──
     if (!studentName) {
       if (!hasSubjectData(row)) continue; // truly empty filler row
@@ -179,7 +239,27 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     }
     if (serialNo > 0) seenSerials.add(serialNo);
 
+    const studentId = normalizeStudentId(cellVal(row, COL.studentId));
+    if (studentId) {
+      const usedBy = seenIds.get(studentId);
+      if (usedBy) {
+        errors.push(
+          `Row ${i + 1} ("${studentName}"): Student ID ${studentId} is already used by "${usedBy}" above — ` +
+          `every child must have their own ID. Fix the Student ID column on Master (never copy-drag or reuse IDs).`
+        );
+      } else {
+        seenIds.set(studentId, studentName);
+      }
+      if (!isAppStudentId(studentId) && !isErrorText(studentId)) {
+        errors.push(
+          `Row ${i + 1} ("${studentName}"): Student ID "${studentId}" isn't the app's format (S001, S002…). ` +
+          `Clear the cell on Master and let the app assign one (close Excel, press Refresh).`
+        );
+      }
+    }
+
     current = {
+      studentId: isErrorText(studentId) ? "" : studentId,
       serialNo,
       studentName,
       parentName:      cellVal(row, COL.parentName),
@@ -196,6 +276,70 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
       totalFee: 0,
     };
     students.push(current);
+  }
+
+  // ── Identity safety checks ────────────────────────────────────────────────
+  // Missing IDs: the child can't be safely invoiced/receipted until the app
+  // assigns one (done automatically on refresh while the file isn't open in
+  // Excel — see assignMissingStudentIds).
+  const noId = students.filter((s) => !s.studentId).map((s) => s.studentName);
+  if (noId.length > 0) {
+    errors.push(
+      `${noId.length} student(s) have no Student ID yet (${noId.slice(0, 3).join(", ")}${noId.length > 3 ? "…" : ""}). ` +
+      `Close the spreadsheet in Excel and press Refresh — the app will assign IDs automatically.`
+    );
+  }
+  // Stamp checks: app-written stamps carry the child's Student ID and the term
+  // they were issued for. Two things can silently go wrong on a sheet, and both
+  // leave fingerprints in the stamps:
+  //  • rows shifted (Master sorted / a half-done deletion) → stamp ID ≠ row ID;
+  //  • a term tab copied from a filled term without clearing I–R → stamp slug ≠
+  //    this tab's slug, and every child looks already-invoiced.
+  const slug = sheetSlug(sheetName);
+  for (const s of students) {
+    if (!s.studentId) continue;
+    for (const [field, label] of [["invoiceIssued", "Invoice Issued"], ["receiptIssued", "Receipt Issued"]] as const) {
+      const stamp = stampInfo(s[field]);
+      if (!stamp) continue;
+      if (stamp.studentId !== s.studentId) {
+        errors.push(
+          `"${s.studentName}" (${s.studentId}): the ${label} mark on their row belongs to ${stamp.studentId} — ` +
+          `the sheet's rows look shifted (was Master sorted or a row half-deleted?). Don't generate anything for this term ` +
+          `until the rows are back in place — restore an earlier version of the file if unsure (Drive keeps version history).`
+        );
+      } else if (stamp.slug !== slug) {
+        errors.push(
+          `"${s.studentName}": the ${label} mark on this tab is from ${stamp.slug}, not ${slug} — ` +
+          `this tab was probably copied from an old term without clearing columns I–R. Clear I–R (rows 2 down) on this tab.`
+        );
+      }
+    }
+  }
+
+  // Roster completeness: every child on Master should appear on the ACTIVE term
+  // tab (identity columns are mirrored by formulas). If someone is on Master but
+  // invisible here, a row was inserted into the middle of Master (the mirror
+  // formulas skew and the new row has no mirror), or their term-tab row was
+  // deleted. Either way they'd silently never be billed — say so.
+  if (mastersheet && sheetName === activeTermSheet(wb.SheetNames)) {
+    const termIds   = new Set(students.map((s) => s.studentId).filter(Boolean));
+    const termNames = new Set(students.map((s) => s.studentName.trim().toLowerCase()));
+    const missing: string[] = [];
+    const mRaw = XLSX.utils.sheet_to_json<Row>(mastersheet, { header: 1, defval: "", blankrows: false });
+    for (let i = 1; i < mRaw.length; i++) {
+      const name = cellVal(mRaw[i], COL.studentName);
+      if (!name || isErrorText(name)) continue;
+      const id = normalizeStudentId(cellVal(mRaw[i], 8)); // Master column I
+      const onTerm = id ? termIds.has(id) : termNames.has(name.trim().toLowerCase());
+      if (!onTerm) missing.push(name);
+    }
+    if (missing.length > 0) {
+      errors.push(
+        `${missing.length} student(s) on Master are NOT appearing on this term tab (${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}) ` +
+        `— they would never be billed. This happens when a row is inserted into the MIDDLE of Master (always add new students at the bottom) ` +
+        `or when their row on this tab was deleted. Move them to the bottom of Master, or restore an earlier version of the file.`
+      );
+    }
   }
 
   return {

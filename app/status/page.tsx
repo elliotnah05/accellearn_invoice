@@ -115,6 +115,7 @@ export default function StatusPage() {
             <thead>
               <tr style={{ backgroundColor: "#AB33DA" }} className="text-white text-xs uppercase tracking-wide">
                 <th className="px-4 py-3 text-left font-semibold">#</th>
+                <th className="px-4 py-3 text-left font-semibold">ID</th>
                 <th className="px-4 py-3 text-left font-semibold">Student</th>
                 <th className="px-4 py-3 text-right font-semibold">Total</th>
                 <th className="px-4 py-3 text-center font-semibold">Invoiced</th>
@@ -127,8 +128,9 @@ export default function StatusPage() {
               {students.map((s, i) => {
                 const rs = receiptState(s);
                 return (
-                  <tr key={s.serialNo} className={`border-t border-gray-100 ${i % 2 === 1 ? "bg-gray-50" : "bg-white"}`}>
+                  <tr key={s.studentId || `#${s.serialNo}`} className={`border-t border-gray-100 ${i % 2 === 1 ? "bg-gray-50" : "bg-white"}`}>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{s.serialNo}</td>
+                    <td className="px-4 py-2.5 text-gray-500 text-xs font-mono">{s.studentId || "—"}</td>
                     <td className="px-4 py-2.5 font-medium text-gray-800 whitespace-nowrap">{s.studentName}</td>
                     <td className="px-4 py-2.5 text-right font-bold" style={{ color: "#AB33DA" }}>{fmtCurrency(s.totalFee)}</td>
                     <td className="px-4 py-2.5 text-center">
