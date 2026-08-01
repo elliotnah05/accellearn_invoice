@@ -172,6 +172,77 @@ export interface AssignResult {
   warning?: string;
 }
 
+export interface CleanupResult {
+  ok: boolean;
+  removed: number;
+  warning?: string;
+}
+
+/** Rows on this sheet (descending) whose identity cells hold an Excel error —
+ *  the husk left behind when the student's row is deleted from Master.
+ *  Descending so deleting one never shifts the index of the next. */
+function brokenRows(ws: ExcelJS.Worksheet): number[] {
+  const rows: number[] = [];
+  for (let r = 2; r <= ws.rowCount; r++) {
+    for (const c of [COL_STUDENT_NAME, COL_STUDENT_ID]) {
+      const v = ws.getRow(r).getCell(c).value;
+      const isErr =
+        v !== null && typeof v === "object" &&
+        (("error" in v) || ("result" in v && !!(v as ExcelJS.CellFormulaValue).result &&
+          typeof (v as ExcelJS.CellFormulaValue).result === "object" &&
+          "error" in ((v as ExcelJS.CellFormulaValue).result as object)));
+      if (isErr) { rows.push(r); break; }
+    }
+  }
+  return rows.reverse();
+}
+
+/**
+ * Deletes the leftover rows a term tab keeps after a student is removed on
+ * Master, so the admin's single action — delete the student where they were
+ * typed — leaves every tab clean, with no #REF! for them to look at or tidy up
+ * by hand.
+ *
+ * Removing the row is what realigns the tab. Excel has already repointed the
+ * rows below to follow their own students; deleting the dead row in between
+ * shifts that block up so each row's term data sits beside the student it
+ * belongs to again. References to Master are untouched by an in-sheet row
+ * delete, so nothing else moves.
+ *
+ * Never touches Master (that's the admin's own list) and never touches a row
+ * that still resolves to a student. Best-effort like every write-back: a file
+ * open in Excel yields a warning, not a failure.
+ */
+export async function removeBrokenLinkRows(config: TemplateConfig): Promise<CleanupResult> {
+  const file = config.spreadsheetPath?.trim();
+  if (!file) return { ok: false, removed: 0, warning: "Spreadsheet path not set in Invoice Template → Folders." };
+  if (!existsSync(file)) return { ok: false, removed: 0, warning: "Spreadsheet file not found." };
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(file);
+    let removed = 0;
+    for (const ws of wb.worksheets) {
+      if (isMasterSheet(ws.name)) continue;
+      for (const r of brokenRows(ws)) {
+        ws.spliceRows(r, 1);
+        removed++;
+      }
+    }
+    if (removed === 0) return { ok: true, removed: 0 };
+    await wb.xlsx.writeFile(file);
+    return { ok: true, removed };
+  } catch (err) {
+    const busy = err instanceof Error && err.message.includes("EBUSY");
+    return {
+      ok: false,
+      removed: 0,
+      warning: busy
+        ? "Close the spreadsheet in Excel and press Refresh — the app will clear the leftover rows from the term tabs."
+        : "Could not clear the leftover rows from the term tabs.",
+    };
+  }
+}
+
 /** Gives every child on Master a permanent Student ID if they don't have one.
  *
  *  IDs live as typed values in Master column I; each term tab mirrors them in

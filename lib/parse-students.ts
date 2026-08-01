@@ -322,11 +322,10 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
   // are already excluded from billing, so this is housekeeping, not a fault —
   // worded that way so it doesn't read as something being wrong.
   if (leftoverRows.length > 0) {
-    const shown = leftoverRows.slice(0, 6).join(", ");
     errors.push(
-      `Tidy-up only (nothing is wrong): ${leftoverRows.length} empty leftover row(s) from student(s) you removed ` +
-      `are still on this tab — row ${shown}${leftoverRows.length > 6 ? " and others" : ""}. They are ignored and ` +
-      `nobody is billed from them. Delete those rows in Excel whenever it suits you, or just leave them.`
+      `Tidy-up only (nothing is wrong): ${leftoverRows.length} empty row(s) left over from student(s) you removed. ` +
+      `Nobody is billed from them. The app clears them for you automatically — if you can still see them in Excel, ` +
+      `close the spreadsheet and press Refresh.`
     );
   }
 

@@ -1,7 +1,7 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 2 August 2026 (v0.12.1)
+**Last updated:** 2 August 2026 (v0.12.2)
 **Who it's for:** The centre owner and any admin who runs billing. Keep this file in the shared Google Drive folder and hand it to every new admin. New to the app? Read sections 1–4 in order. A short version history is at the very end.
 
 ---
@@ -208,7 +208,7 @@ Every student has a permanent **Student ID** (Master column I, mirrored to term 
 | A student on Master not appearing on the term tab | Named, so they aren't silently left unbilled |
 | Marks copied from a previous term onto a new tab | The tab is named, with a reminder to clear columns I–R |
 | The order of students changed since the last refresh | Flagged as a possible accidental sort, with recovery instructions |
-| A leftover `#REF!` row from a student you deleted | Ignored completely — nobody is billed from it. Mentioned only as optional tidy-up |
+| A leftover `#REF!` row from a student you deleted | Deleted automatically on the next Refresh (spreadsheet closed in Excel). Nobody is ever billed from it |
 
 **Responsibilities the app cannot take over.** These change the meaning of the data itself, so no automatic check can decide the right outcome — please follow them as standing practice:
 
@@ -242,10 +242,10 @@ Remember: **blank = 12, `0` = not billed, any number = that many.**
 2. **Delete their row on `Master` only** — right-click the row number on the left edge → Delete. A two-subject child has two rows, so delete both. **You do not need to touch the term tabs.** Master is the one place a student is typed, and the one place they're removed.
 3. Save. The serial numbers close up by themselves and the student disappears from every term tab.
 4. That's it. Nobody else's records move: every other child keeps their Student ID, so all invoices, receipts and stamps stay attached to the right people. The leaver's PDFs stay safely in the shared Drive folder, and their ID is never given to anyone else.
-5. **You may see `#REF!` appear in a row on the term tabs.** That's normal and harmless — it's the empty shell of the row you removed. The app ignores it completely and nobody is billed from it; it simply mentions it as tidy-up. Delete that row on the term tab whenever it suits you, or leave it.
+5. **Nothing else to do.** If a `#REF!` row briefly appears on a term tab, that is just the empty shell of the row you removed — the app deletes it for you on the next Refresh (with the spreadsheet closed in Excel). You never need to tidy the term tabs by hand.
 6. **Deleted too soon and need their invoice again?** Usually the PDF in the Drive folder *is* the record. If it's truly lost: re-add their row on Master and type their **old Student ID** into column I by hand (it's in the PDF filename), generate, then delete again.
 
-> **Why Master only?** Each term tab pulls its names from Master by formula. When you delete a row on Master, Excel moves every other row's link along with its student, so the rest of the tab stays correctly matched to the right people. Only the departed student's own row is left behind as `#REF!`, and the app is built to skip it.
+> **Why Master only?** Each term tab pulls its names from Master by formula. When you delete a row on Master, Excel moves every other row's link along with its student, so the rest of the tab stays correctly matched to the right people. Only the departed student's own row is left behind, and the app removes it for you.
 
 ### Start a new term
 Most terms already exist as blank tabs. To start one:
@@ -332,6 +332,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.12.2** — **The term tabs now clean themselves up.** After a student is removed on the Master tab, the empty row Excel leaves behind on each term tab is deleted automatically on the next Refresh, so removing a student really is a single action in a single place and there is nothing left to look at or tidy by hand.
 - **v0.12.1** — **Removing a student is now done on the `Master` tab alone.** Previously a deleted student left a broken row on each term tab that the app mistook for an extra subject of the student above, quietly inflating that student's fee. Those leftover rows are now recognised and skipped entirely, so nothing is billed from them and no one else is affected; the app mentions them only as optional tidy-up. Row numbers in messages now match the row numbers shown in Excel.
 - **v0.12.0** — **Permanent Student IDs.** Every child gets a code (`S001`, `S002`…) in Master column I, assigned by the app automatically and **never reused**. All matching — invoice numbers, receipt numbers, the marks written into columns L/O/R — now keys on this ID instead of the serial number, so **deleting or reordering students can no longer shift anyone's invoice/receipt history** (the bug where a deletion made the app re-issue invoices for everyone below). Serial No is now display-only. Invoice Issued stamps changed from `Yes` to `INV-… · date` so every mark identifies its child; the app detects and warns about marks sitting on the wrong row, leftover rows from deletions, and missing/duplicate IDs. Term-tab links to Master extended from row 500 to **row 1000** (the whole formatted sheet). Also added: automatic checks each refresh for duplicate IDs, marks sitting beside the wrong student, students missing from a term tab, marks copied from another term, and accidental re-sorting of Master — each shown as a "Spreadsheet needs attention" panel naming the student or row (§4, *Safeguards*). One-time upgrade: `node scripts/add-student-ids.js "<workbook.xlsx>"` (makes a backup, IDs all current students, audits for leftover deletion damage).
 - **v0.11.2** — **Status page now reads everything from the spreadsheet** (it previously read receipts from a file stored on your own computer, so a new admin's Status page showed zero receipts while the Receipts page correctly showed them). Added an **Invoices issued** tile and column.

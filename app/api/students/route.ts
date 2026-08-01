@@ -1,7 +1,7 @@
 import { readFileSync, statSync, existsSync, writeFileSync } from "fs";
 import path from "path";
 import { parseWorkbook, idOrderChanged } from "@/lib/parse-students";
-import { assignMissingStudentIds } from "@/lib/sheet-writeback";
+import { assignMissingStudentIds, removeBrokenLinkRows } from "@/lib/sheet-writeback";
 import type { TemplateConfig } from "@/app/api/config/route";
 import { CONFIG_PATH, DATA_DIR, readJson } from "@/lib/paths";
 
@@ -63,6 +63,21 @@ export async function GET(request: Request) {
       return Response.json({ error: "Master spreadsheet is unexpectedly large (over 10 MB) — refusing to parse." }, { status: 413 });
     }
     let result = parseWorkbook(readFileSync(file), requestedSheet);
+
+    // Removing a student is done on Master alone. Excel leaves a dead #REF! row
+    // on each term tab; clear those now so the admin never has to look at them
+    // or tidy them by hand. Deleting the row is also what realigns the tab, so
+    // the sheet returns to a clean state on its own. Best-effort: if Excel has
+    // the file open the rows are simply skipped this time (the parser already
+    // ignores them) and cleared on a later refresh.
+    if (result.errors.some((e) => e.startsWith("Tidy-up only"))) {
+      const cleaned = await removeBrokenLinkRows(config);
+      if (cleaned.removed > 0) {
+        result = parseWorkbook(readFileSync(file), requestedSheet); // re-read the tidied sheet
+      } else if (cleaned.warning) {
+        result = { ...result, errors: [...result.errors, cleaned.warning] };
+      }
+    }
 
     // Any child without a permanent Student ID (new row typed into Master, or a
     // workbook that predates IDs) gets one assigned now, written into Master
