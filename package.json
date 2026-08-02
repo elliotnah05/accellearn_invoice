@@ -9,6 +9,7 @@
     "postbuild": "node scripts/prepare-standalone.js",
     "start": "next start",
     "lint": "eslint",
+    "test:roster": "node scripts/roster-tests/run.js",
     "electron": "node scripts/dev-electron.js",
     "app:build": "next build",
     "app:start": "node scripts/dev-electron.js",
