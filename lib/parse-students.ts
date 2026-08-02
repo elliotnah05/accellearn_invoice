@@ -129,14 +129,18 @@ function brokenLinkRows(ws: XLSX.WorkSheet): Set<number> {
   const ref = ws["!ref"];
   if (!ref) return rows;
   const range = XLSX.utils.decode_range(ref);
+  const cellAt = (r: number, c: number) => ws[XLSX.utils.encode_cell({ r, c })] as { t?: string; v?: unknown } | undefined;
   for (let r = range.s.r; r <= range.e.r; r++) {
-    for (const c of [COL.studentName, COL.studentId] as number[]) {
-      const cell = ws[XLSX.utils.encode_cell({ r, c })] as { t?: string } | undefined;
-      if (cell && cell.t === "e") {
-        rows.add(r + 1);
-        break;
-      }
-    }
+    const name = cellAt(r, COL.studentName);
+    // A NAME that reads #REF! is the giveaway: nothing identifies this row.
+    if (name?.t === "e") { rows.add(r + 1); continue; }
+    // A broken Student ID alone is NOT a husk when the name still resolves.
+    // That combination is a frozen past term whose ID column was left linked by
+    // an older freeze: the student really was billed that term and their row is
+    // the record of it. Only when the name is blank too is there nobody here.
+    const nameText = name && name.v !== undefined && name.v !== null ? String(name.v).trim() : "";
+    if (nameText !== "") continue;
+    if (cellAt(r, COL.studentId)?.t === "e") rows.add(r + 1);
   }
   return rows;
 }
@@ -411,7 +415,8 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
   // Only linked tabs are checked. A frozen past term (freeze-term.js turns its
   // formulas into values) legitimately has no links and must not gain students.
   const rosterGaps: RosterGap[] = [];
-  if (mastersheet && isLinkedTab(ws, raw.length)) {
+  const frozenTab = !!mastersheet && !isLinkedTab(ws, raw.length);
+  if (mastersheet && !frozenTab) {
     // Read Master the same way a term tab is read: a named row starts a child,
     // rows under it with a subject but no name are that child's extra subjects.
     // blankrows:true keeps mMaster[i] on sheet row i+1, so reported row numbers
@@ -474,5 +479,6 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     sheetNames: termSheets,
     rosterGaps,
     leftoverRows,
+    frozenTab,
   };
 }

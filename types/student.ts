@@ -61,6 +61,11 @@ export interface ParseResult {
   /** Master rows with no row on this term tab yet (see RosterGap). Empty on a
    *  frozen term tab, which is deliberately never topped up. */
   rosterGaps: RosterGap[];
+  /** True when this tab no longer mirrors Master — a past term closed off by
+   *  freeze-term.js. Its roster is a finished record: never topped up with
+   *  students who joined later, never stripped of ones who left later. False
+   *  for a live term, and for a workbook that has no Master tab at all. */
+  frozenTab: boolean;
   /** Sheet rows (1-based) left behind by a student removed on Master: a broken
    *  #REF! row, or a nameless row still holding their term data. Billed to
    *  nobody; the app tidies them away. */

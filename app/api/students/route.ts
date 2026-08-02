@@ -71,9 +71,13 @@ export async function GET(request: Request) {
     // tab, so the sheet returns to a clean state on its own. Best-effort: if
     // Excel has the file open the rows are simply skipped this time (the parser
     // already ignores them) and cleared on a later refresh.
-    if (result.leftoverRows.length > 0) {
+    // Leftovers are counted on the tab being viewed — except on a frozen past
+    // term, which by design shows none of them. Viewing one must not stop the
+    // other tabs being tidied, so there the pass runs unconditionally (it reads
+    // the workbook and writes only if it finds something).
+    if (result.leftoverRows.length > 0 || result.frozenTab) {
       const cleaned = await tidyTermTabs(config);
-      if (cleaned.removed + cleaned.cleared > 0) {
+      if (cleaned.removed + cleaned.cleared + cleaned.repaired > 0) {
         result = parseWorkbook(readFileSync(file), requestedSheet); // re-read the tidied sheet
       } else if (cleaned.warning) {
         result = { ...result, errors: [...result.errors, cleaned.warning] };

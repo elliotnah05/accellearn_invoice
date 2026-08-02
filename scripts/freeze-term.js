@@ -8,20 +8,27 @@
  * or corrects a name on Master, that closed term would silently change and no
  * longer match the PDFs the parents were sent.
  *
- * This converts one term tab's A–H formulas into their plain current values, so
- * the tab becomes a permanent record. Everything else is left untouched.
+ * This converts one term tab's A–H formulas — and the Student ID in column S,
+ * which is linked the same way — into their plain current values, so the tab
+ * becomes a permanent record. Everything else is left untouched.
+ *
+ * Column S matters as much as the names: leave it linked and deleting a student
+ * from Master later breaks it to #REF!, which is exactly the signal the app uses
+ * to clear out a departed student's row. A closed term would then lose the row
+ * of someone it really did invoice.
  *
  * Usage:
  *   node scripts/freeze-term.js "<path to workbook>" "<term tab name>"
  *   node scripts/freeze-term.js "<path>" "AY 26 T3" --dry-run
  *
- * The equivalent by hand in Excel: select A2:H500 on the term tab, Copy, then
- * Paste Special → Values.
+ * The equivalent by hand in Excel: select A2:H500 and S2:S500 on the term tab,
+ * Copy, then Paste Special → Values.
  */
 const ExcelJS = require("exceljs");
 const path = require("path");
 
 const IDENTITY_LAST_COL = 8; // H
+const STUDENT_ID_COL = 19;   // S — linked to Master column I, frozen alongside A–H
 
 async function main() {
   const [file, term, ...rest] = process.argv.slice(2);
@@ -53,7 +60,7 @@ async function main() {
   // every name in the term.
   const formulaCells = [];
   for (let r = 2; r <= ws.rowCount; r++) {
-    for (let c = 1; c <= IDENTITY_LAST_COL; c++) {
+    for (const c of [...Array(IDENTITY_LAST_COL).keys()].map((i) => i + 1).concat(STUDENT_ID_COL)) {
       const cell = ws.getRow(r).getCell(c);
       const v = cell.value;
       if (v && typeof v === "object" && "formula" in v) formulaCells.push({ cell, v });

@@ -1,7 +1,7 @@
 # AccelLearn Invoices & Receipts — Owner & Admin Guide
 
 **App:** AccelLearn Invoices (Windows & Mac desktop app)
-**Last updated:** 2 August 2026 (v0.13.0)
+**Last updated:** 2 August 2026 (v0.13.1)
 **Who it's for:** The centre owner and any admin who runs billing. Keep this file in the shared Google Drive folder and hand it to every new admin. New to the app? Read sections 1–4 in order. A short version history is at the very end.
 
 ---
@@ -207,6 +207,7 @@ Every student has a permanent **Student ID** (Master column I, mirrored to term 
 | A status mark sitting beside the wrong student (rows shifted) | Named, with a prompt to restore the file before generating anything |
 | A student added anywhere on Master — including between two existing rows | Given a row in the same position on every live term tab automatically, so they're never left unbilled |
 | A student removed by clearing their Master row instead of deleting it | The lessons/fees left behind on the term tab are cleared, so they're billed to nobody (and never added to the student above) |
+| A student removed after a term was frozen | The frozen term keeps their row and their figures — it is the record of a term they really were billed for. Only live terms drop them |
 | Marks copied from a previous term onto a new tab | The tab is named, with a reminder to clear columns I–R |
 | The order of students changed since the last refresh | Flagged as a possible accidental sort, with recovery instructions |
 | A leftover `#REF!` row from a student you deleted | Deleted automatically on the next Refresh (spreadsheet closed in Excel). Nobody is ever billed from it |
@@ -244,12 +245,21 @@ Remember: **blank = 12, `0` = not billed, any number = that many.**
 ### A student who leaves for good (delete their row)
 1. **Finish their paperwork first** — their last invoice is already out; if a final payment comes in, mark it Paid and generate their receipt as normal. The app can only generate documents for students still on the sheet.
 2. **Delete their row on `Master` only** — right-click the row number on the left edge → Delete. A two-subject child has two rows, so delete both. **You do not need to touch the term tabs.** Master is the one place a student is typed, and the one place they're removed.
-3. Save. The serial numbers close up by themselves and the student disappears from every term tab.
+3. Save. The serial numbers close up by themselves and the student disappears from every **live** term tab. A **frozen** term (§5) keeps their row — it is the record of a term they really were invoiced for, and it must not change.
 4. That's it. Nobody else's records move: every other child keeps their Student ID, so all invoices, receipts and stamps stay attached to the right people. The leaver's PDFs stay safely in the shared Drive folder, and their ID is never given to anyone else.
 5. **Nothing else to do.** If a `#REF!` row briefly appears on a term tab, that is just the empty shell of the row you removed — the app deletes it for you on the next Refresh (with the spreadsheet closed in Excel). You never need to tidy the term tabs by hand.
 6. **Deleted too soon and need their invoice again?** Usually the PDF in the Drive folder *is* the record. If it's truly lost: re-add their row on Master and type their **old Student ID** into column I by hand (it's in the PDF filename), generate, then delete again.
 
 > **Why Master only?** Each term tab pulls its names from Master by formula. When you delete a row on Master, Excel moves every other row's link along with its student, so the rest of the tab stays correctly matched to the right people. Only the departed student's own row is left behind, and the app removes it for you. If you clear the row's contents instead of deleting the row, the app clears the lessons and fees left stranded on the term tabs instead — either way, nobody is billed from it and no one else is touched.
+
+### Freeze a finished term
+When a term is over and its invoices and receipts have gone out, freeze it so a later edit on Master can't rewrite what parents were already sent:
+
+```
+node scripts/freeze-term.js "<path to the spreadsheet>" "AY 26 T4"
+```
+
+By hand in Excel: select **A2:H1000** and **S2:S1000** on that tab, Copy, then **Paste Special → Values**. That converts the linked columns (names, rates *and* the Student ID) into plain text. From then on the app treats the tab as a closed record: students who join later are not added to it, students who leave later are not removed from it, and nothing on it is rewritten.
 
 ### Start a new term
 Most terms already exist as blank tabs. To start one:
@@ -336,6 +346,7 @@ Admins can ignore this section.
 
 ## Version history
 
+- **v0.13.1** — **A frozen term is now genuinely closed.** Removing a student used to delete their row from finished terms too, erasing the record of invoices those terms really did issue; frozen tabs are now left untouched, and `freeze-term.js` also freezes the Student ID column (leaving it linked was what let a later deletion reach in). If a term was frozen by the older script, the app repairs its broken ID cells from the invoice/receipt marks on the same row. Also: when the spreadsheet can't be written because Drive has it locked or the file is read-only, the app now says to close the spreadsheet and refresh, instead of a vague "could not update".
 - **v0.13.0** — **Add a student anywhere on Master, not just at the bottom.** Inserting a row in the middle — next to the others of their level, which is how the roster reads — used to leave the new student invisible on every term tab and silently unbilled. The app now gives them a row in the same position on every live term tab (frozen terms are left alone), fills in their linked details and assigns their Student ID, all on the next Refresh. Adding an extra subject under an existing student works the same way. Removing a student by *clearing* their Master row (rather than deleting it) is now handled too: the lessons and fees stranded on the term tab are cleared instead of being quietly added to the student above.
 - **v0.12.2** — **The term tabs now clean themselves up.** After a student is removed on the Master tab, the empty row Excel leaves behind on each term tab is deleted automatically on the next Refresh, so removing a student really is a single action in a single place and there is nothing left to look at or tidy by hand.
 - **v0.12.1** — **Removing a student is now done on the `Master` tab alone.** Previously a deleted student left a broken row on each term tab that the app mistook for an extra subject of the student above, quietly inflating that student's fee. Those leftover rows are now recognised and skipped entirely, so nothing is billed from them and no one else is affected; the app mentions them only as optional tidy-up. Row numbers in messages now match the row numbers shown in Excel.

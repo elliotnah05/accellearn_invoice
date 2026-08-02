@@ -30,6 +30,35 @@ export interface WritebackResult {
   warning?: string;
 }
 
+/** Every write here is best-effort: the workbook lives in a shared Drive folder
+ *  and is usually open in Excel. Windows reports that as EBUSY, but a file
+ *  locked by Drive's sync or left read-only comes back as EPERM/EACCES — all
+ *  three mean "someone else has the file", and the admin needs the same
+ *  instruction, not a shrug. */
+function isFileBusy(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as NodeJS.ErrnoException).code ?? "";
+  return /^(EBUSY|EPERM|EACCES)$/.test(code) || /\b(EBUSY|EPERM|EACCES)\b/.test(err.message);
+}
+
+/** The Student ID carried by an app-written stamp ("INV-AY26T4-S007 · 01/08/26"
+ *  → "S007"). Empty for a hand-typed mark. */
+function stampStudentId(text: string): string {
+  const m = text.match(/\b(?:INV|R)-[A-Z0-9]+-(S\d+)\b/i);
+  return m ? m[1] : "";
+}
+
+/** Is this tab still mirroring Master, or is it a frozen past term whose
+ *  formulas were turned into plain values by freeze-term.js? A frozen term is a
+ *  closed record: it must never gain a student who joined later, and never lose
+ *  one who left later. Nothing in here writes to a tab this returns false for. */
+function isLinkedTab(ws: ExcelJS.Worksheet): boolean {
+  for (let r = 2; r <= ws.rowCount; r++) {
+    if (linkedMasterRow(ws.getRow(r).getCell(COL_STUDENT_NAME)) !== null) return true;
+  }
+  return false;
+}
+
 async function withSheet(
   config: TemplateConfig,
   term: string,
@@ -52,7 +81,7 @@ async function withSheet(
     await wb.xlsx.writeFile(file);
     return { ok: true };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isFileBusy(err);
     return {
       ok: false,
       warning: busy
@@ -194,6 +223,8 @@ export interface CleanupResult {
   removed: number;
   /** Rows whose stale term data was cleared (Master row was blanked instead). */
   cleared: number;
+  /** Student ID cells on a frozen term repaired from that row's own stamp. */
+  repaired: number;
   warning?: string;
 }
 
@@ -240,15 +271,38 @@ function brokenRows(ws: ExcelJS.Worksheet): number[] {
  */
 export async function tidyTermTabs(config: TemplateConfig): Promise<CleanupResult> {
   const file = config.spreadsheetPath?.trim();
-  if (!file) return { ok: false, removed: 0, cleared: 0, warning: "Spreadsheet path not set in Invoice Template → Folders." };
-  if (!existsSync(file)) return { ok: false, removed: 0, cleared: 0, warning: "Spreadsheet file not found." };
+  if (!file) return { ok: false, removed: 0, cleared: 0, repaired: 0, warning: "Spreadsheet path not set in Invoice Template → Folders." };
+  if (!existsSync(file)) return { ok: false, removed: 0, cleared: 0, repaired: 0, warning: "Spreadsheet file not found." };
   try {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.readFile(file);
     let removed = 0;
     let cleared = 0;
+    let repaired = 0;
     for (const ws of wb.worksheets) {
       if (isMasterSheet(ws.name)) continue;
+
+      // A frozen past term keeps every student it billed, including ones who
+      // have since left — that's the whole point of freezing it. Deleting a row
+      // here would erase a finished term's record of a real invoice. The one
+      // thing worth touching is a Student ID cell left reading #REF! by an
+      // older freeze (which converted A–H but not S): the row's own stamp still
+      // names the child, so put that ID back as a plain value.
+      if (!isLinkedTab(ws)) {
+        for (let r = 2; r <= ws.rowCount; r++) {
+          const row = ws.getRow(r);
+          const idCell = row.getCell(COL_STUDENT_ID);
+          if (!/^#(REF|N\/A|VALUE|NAME|DIV\/0|NULL|NUM)[!?]?$/i.test(cellText(idCell))) continue;
+          const fromStamp =
+            stampStudentId(cellText(row.getCell(COL_INVOICE_ISSUED))) ||
+            stampStudentId(cellText(row.getCell(COL_RECEIPT_ISSUED)));
+          if (!fromStamp) continue;
+          idCell.value = normalizeStudentId(fromStamp);
+          repaired++;
+        }
+        continue;
+      }
+
       for (const r of brokenRows(ws)) {
         ws.spliceRows(r, 1);
         removed++;
@@ -268,15 +322,16 @@ export async function tidyTermTabs(config: TemplateConfig): Promise<CleanupResul
         cleared++;
       }
     }
-    if (removed === 0 && cleared === 0) return { ok: true, removed: 0, cleared: 0 };
+    if (removed === 0 && cleared === 0 && repaired === 0) return { ok: true, removed: 0, cleared: 0, repaired: 0 };
     await wb.xlsx.writeFile(file);
-    return { ok: true, removed, cleared };
+    return { ok: true, removed, cleared, repaired };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isFileBusy(err);
     return {
       ok: false,
       removed: 0,
       cleared: 0,
+      repaired: 0,
       warning: busy
         ? "Close the spreadsheet in Excel and press Refresh — the app will clear the leftover rows from the term tabs."
         : "Could not clear the leftover rows from the term tabs.",
@@ -466,7 +521,7 @@ export async function syncTermRosters(config: TemplateConfig): Promise<RosterSyn
     await wb.xlsx.writeFile(file);
     return { ok: true, names: [...names], rows };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isFileBusy(err);
     return {
       ok: false,
       names: [],
@@ -514,18 +569,14 @@ export async function assignMissingStudentIds(config: TemplateConfig): Promise<A
       const n = idNumber(id);
       if (n !== null && n > maxId) maxId = n;
     };
-    const stampId = (t: string): string => {
-      const m = t.match(/\b(?:INV|R)-[A-Z0-9]+-(S\d+)\b/i);
-      return m ? m[1] : "";
-    };
     for (const ws of wb.worksheets) {
       const isM = isMasterSheet(ws.name);
       for (let r = 2; r <= ws.rowCount; r++) {
         const row = ws.getRow(r);
         seen(cellText(row.getCell(isM ? MASTER_COL_ID : COL_STUDENT_ID)));
         if (!isM) {
-          seen(stampId(cellText(row.getCell(COL_INVOICE_ISSUED))));
-          seen(stampId(cellText(row.getCell(COL_RECEIPT_ISSUED))));
+          seen(stampStudentId(cellText(row.getCell(COL_INVOICE_ISSUED))));
+          seen(stampStudentId(cellText(row.getCell(COL_RECEIPT_ISSUED))));
         }
       }
     }
@@ -556,8 +607,8 @@ export async function assignMissingStudentIds(config: TemplateConfig): Promise<A
           if (linkedMasterRow(ws.getRow(r).getCell(COL_STUDENT_NAME)) !== masterRow) continue;
           const row = ws.getRow(r);
           const fromStamp =
-            stampId(cellText(row.getCell(COL_INVOICE_ISSUED))) ||
-            stampId(cellText(row.getCell(COL_RECEIPT_ISSUED)));
+            stampStudentId(cellText(row.getCell(COL_INVOICE_ISSUED))) ||
+            stampStudentId(cellText(row.getCell(COL_RECEIPT_ISSUED)));
           const id = normalizeStudentId(fromStamp);
           if (id && !masterIds.has(id)) return id;
         }
@@ -616,7 +667,7 @@ export async function assignMissingStudentIds(config: TemplateConfig): Promise<A
     await wb.xlsx.writeFile(file);
     return { ok: true, assigned: assignedRows.length };
   } catch (err) {
-    const busy = err instanceof Error && err.message.includes("EBUSY");
+    const busy = isFileBusy(err);
     return {
       ok: false,
       assigned: 0,
