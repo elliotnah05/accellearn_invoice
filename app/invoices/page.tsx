@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Fragment } from "react";
 import Link from "next/link";
-import { subjectsText, totalLessons, type ParseResult, type Student } from "@/types/student";
+import { subjectsText, totalLessons, identityKey, type ParseResult, type Student } from "@/types/student";
 import { isDesktop, openFolder } from "@/lib/desktop";
 
 type ApprovalStatus = "pending" | "approved" | "flagged";
@@ -191,8 +191,30 @@ export default function InvoicesPage() {
     return new Set([...count.entries()].filter(([, n]) => n > 1).map(([id]) => id));
   })();
 
+  /** Children indistinguishable on the sheet: the same name AND parent. Almost
+   *  always one child typed twice — exporting both would bill the family
+   *  double, so approval locks until the sheet says which row is real. */
+  const dupIdents = (() => {
+    const count = new Map<string, number>();
+    for (const r of rows) {
+      const k = identityKey(r.student.studentName, r.student.parentName);
+      count.set(k, (count.get(k) ?? 0) + 1);
+    }
+    return new Set([...count.entries()].filter(([, n]) => n > 1).map(([k]) => k));
+  })();
+
+  function blockReason(s: Student): { label: string; hint: string } | null {
+    if (s.studentId && dupIds.has(s.studentId)) {
+      return { label: "⚠ Duplicate ID", hint: `Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh` };
+    }
+    if (dupIdents.has(identityKey(s.studentName, s.parentName))) {
+      return { label: "⚠ Same name & parent", hint: "Two rows have this exact name and parent. If it's one child typed twice, delete the extra Master row; if they're different children, make one name distinguishable. Then Refresh" };
+    }
+    return null;
+  }
+
   function isBlocked(s: Student): boolean {
-    return !!s.studentId && dupIds.has(s.studentId);
+    return blockReason(s) !== null;
   }
 
   function approveAll() {
@@ -421,9 +443,9 @@ export default function InvoicesPage() {
                           {isBlocked(row.student) ? (
                             <span
                               className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
-                              title={`Student ID ${row.student.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh`}
+                              title={blockReason(row.student)!.hint}
                             >
-                              ⚠ Duplicate ID
+                              {blockReason(row.student)!.label}
                             </span>
                           ) : (
                           <div className="flex items-center justify-center gap-1.5">

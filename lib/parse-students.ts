@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import {
-  normalizeStudentId, isAppStudentId, recalcStudent,
+  normalizeStudentId, isAppStudentId, identityKey, recalcStudent,
   type ParseResult, type RosterGap, type Student, type SubjectLine,
 } from "@/types/student";
 
@@ -105,17 +105,6 @@ function sheetSlug(name: string): string {
   return name.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "TERM";
 }
 
-/** The key used whenever a student has to be matched WITHOUT a Student ID
- *  (a child typed moments ago has none yet): student name PLUS parent name.
- *  Name alone is not identity — two different children genuinely can share a
- *  full name, and matching on it made the second child invisible: never given
- *  a term row, therefore never given an ID, therefore never billed, with every
- *  name-based safety check satisfied by their namesake. Two children sharing a
- *  name AND a parent is a different-children case the sheet cannot express —
- *  the parser warns on it instead of guessing. */
-export function identityKey(name: string, parent: string): string {
-  return `${name.trim().toLowerCase()}|${parent.trim().toLowerCase()}`;
-}
 
 /**
  * Sheet rows (1-based) whose identity cells hold an Excel error — the husk a

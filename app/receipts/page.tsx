@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { subjectsText, type Student, type ParseResult } from "@/types/student";
+import { subjectsText, identityKey, type Student, type ParseResult } from "@/types/student";
 import type { LedgerEntry } from "@/lib/billing-store";
 import { receiptState } from "@/lib/receipt-status";
 import { isDesktop, openFolder } from "@/lib/desktop";
@@ -116,8 +116,30 @@ export default function ReceiptsPage() {
     return new Set([...count.entries()].filter(([, n]) => n > 1).map(([id]) => id));
   })();
 
+  /** Children indistinguishable on the sheet: the same name AND parent. Almost
+   *  always one child typed twice — generating for both would double up, so
+   *  their action buttons lock until the sheet says which row is real. */
+  const dupIdents = (() => {
+    const count = new Map<string, number>();
+    for (const s of students) {
+      const k = identityKey(s.studentName, s.parentName);
+      count.set(k, (count.get(k) ?? 0) + 1);
+    }
+    return new Set([...count.entries()].filter(([, n]) => n > 1).map(([k]) => k));
+  })();
+
+  function blockReason(s: Student): { label: string; hint: string } | null {
+    if (s.studentId && dupIds.has(s.studentId)) {
+      return { label: "⚠ Duplicate ID", hint: `Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh` };
+    }
+    if (dupIdents.has(identityKey(s.studentName, s.parentName))) {
+      return { label: "⚠ Same name & parent", hint: "Two rows have this exact name and parent. If it's one child typed twice, delete the extra Master row; if they're different children, make one name distinguishable. Then Refresh" };
+    }
+    return null;
+  }
+
   function isBlocked(s: Student): boolean {
-    return !!s.studentId && dupIds.has(s.studentId);
+    return blockReason(s) !== null;
   }
 
   function setRowBusy(key: string, on: boolean) {
@@ -231,7 +253,7 @@ export default function ReceiptsPage() {
     let done = 0;
     for (const s of students) {
       if (rowStatus(s) !== "ready") continue;   // never touches already-generated rows
-      if (isBlocked(s)) continue;               // duplicate Student ID — fix the sheet first
+      if (isBlocked(s)) continue;               // duplicate ID or indistinguishable twin — fix the sheet first
       if (await generate(s)) done++;
     }
     setBulkRunning(false);
@@ -410,9 +432,9 @@ export default function ReceiptsPage() {
                     {isBlocked(s) ? (
                       <span
                         className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
-                        title={`Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh`}
+                        title={blockReason(s)!.hint}
                       >
-                        ⚠ Duplicate ID
+                        {blockReason(s)!.label}
                       </span>
                     ) : (
                       <>

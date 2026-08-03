@@ -1,9 +1,9 @@
 import ExcelJS from "exceljs";
 import { existsSync } from "fs";
 import type { TemplateConfig } from "@/app/api/config/route";
-import { isMasterSheet, identityKey } from "@/lib/parse-students";
+import { isMasterSheet } from "@/lib/parse-students";
 import { readLedger } from "@/lib/billing-store";
-import { normalizeStudentId } from "@/types/student";
+import { normalizeStudentId, identityKey } from "@/types/student";
 
 // Writes receipt status back into the master spreadsheet so Excel and the app
 // always tell the same story. Best-effort: if the file is open in Excel
@@ -505,6 +505,18 @@ export async function syncTermRosters(config: TemplateConfig): Promise<RosterSyn
       if (missing.length === 0) continue;
 
       for (const m of missing) {
+        // A batch can contain its own duplicates: two new rows typed with the
+        // same name and parent, refreshed once. The onTab set was built from
+        // the tab as it WAS before this pass, so it cannot see them — track
+        // what this pass inserts and skip the indistinguishable repeat. The
+        // parser warns on the duplicate and the pages lock its documents; the
+        // admin decides which row is real.
+        const mName = cellText(master.getRow(m).getCell(COL_STUDENT_NAME));
+        if (mName) {
+          const mKey = identityKey(mName, cellText(master.getRow(m).getCell(COL_PARENT_NAME)));
+          if (onTab.has(mKey)) continue;
+          onTab.add(mKey);
+        }
         // Slot the new row where it belongs: straight after the row mirroring
         // the nearest student ABOVE them on Master, so the tab keeps Master's
         // order (which is the admin's level grouping).

@@ -190,6 +190,28 @@ async function main() {
         `errors: ${after.result.errors.slice(0, 2).join(" | ") || "none"}`);
     }
 
+    // Several new rows typed before ONE refresh, two of them identical. The
+    // dedupe checks the tab as it WAS, so it cannot see same-batch duplicates —
+    // the insert pass has to dedupe against itself as well. (Found live: two
+    // identical test rows and one different-parent row, one refresh → all
+    // three billed.)
+    {
+      const file = H.freshCopy(src, "twin-batch.xlsx");
+      const config = H.makeConfig(file);
+      await H.refresh(config, file);
+      const { children: kids } = await H.findSubjects(file);
+      const bottom = kids[kids.length - 1].row + 1;
+      await H.simulateInsert(file, bottom, { name: "Batch Twin", parent: "Same Parent", school: "S", level: "P4", subject: "Math", hrs: 2, rate: 40 });
+      await H.simulateInsert(file, bottom + 1, { name: "Batch Twin", parent: "Same Parent", school: "S", level: "P4", subject: "Science", hrs: 2, rate: 50 });
+      await H.simulateInsert(file, bottom + 2, { name: "Batch Twin", parent: "Different Parent", school: "S", level: "P4", subject: "English", hrs: 2, rate: 45 });
+      const after = await H.refresh(config, file);
+      const twins = after.result.students.filter((s) => s.studentName === "Batch Twin");
+      const warned = after.result.errors.some((e) => e.includes("SAME name and parent"));
+      check("two identical rows typed in one batch don't both get billed",
+        twins.length === 2 && warned,
+        `billed rows named Batch Twin: ${twins.length} (want 2: one of the identical pair + the different-parent child), warned=${warned}`);
+    }
+
     // The reason name matching exists at all: a row pasted over as plain values
     // (no link) still bills its student — they must NOT get a second row.
     {
