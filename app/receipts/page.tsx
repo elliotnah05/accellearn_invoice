@@ -41,7 +41,6 @@ export default function ReceiptsPage() {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [banner, setBanner]       = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
   const [sheetIssues, setSheetIssues] = useState<string[]>([]);
-  const [confirmDup, setConfirmDup] = useState<{ student: Student; entry: LedgerEntry } | null>(null);
   const [preview, setPreview]     = useState<{ url: string; name: string } | null>(null);
   const [previewing, setPreviewing] = useState<Set<string>>(new Set());
   const previewCache = useRef<Record<string, string>>({});
@@ -155,19 +154,15 @@ export default function ReceiptsPage() {
     });
   }
 
-  async function generate(student: Student, force = false): Promise<boolean> {
+  async function generate(student: Student): Promise<boolean> {
     setRowBusy(sKey(student), true);
     try {
       const res = await fetch("/api/receipts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "generate", student, term: sheetName, force }),
+        body: JSON.stringify({ action: "generate", student, term: sheetName }),
       });
       const body = await res.json();
-      if (res.status === 409 && body.duplicate) {
-        setConfirmDup({ student, entry: body.entry });
-        return false;
-      }
       if (!res.ok) {
         setBanner({ kind: "warn", text: body.error ?? "Receipt generation failed" });
         return false;
@@ -383,7 +378,8 @@ export default function ReceiptsPage() {
         </div>
 
         <p className="text-xs text-gray-400">
-          Mark payments in the Excel (Paid + Date of Receipt), re-import, then generate here. Receipt numbers are fixed per
+          Mark payments in the Excel (Paid + Date of Receipt), re-import, then generate here. A row with a Receipt Issued
+          mark (column O) is never generated again — to re-issue one, clear that cell in Excel, save, and Refresh. Receipt numbers are fixed per
           student — re-generating never creates a second receipt, and the app warns before any re-issue.
         </p>
 
@@ -481,16 +477,9 @@ export default function ReceiptsPage() {
                             Mark as Sent
                           </button>
                         )}
-                        {(st === "generated" || st === "sent") && (
-                          <button
-                            onClick={() => generate(s)}
-                            disabled={isBusy || bulkRunning}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40"
-                            title="Re-create this receipt (asks for confirmation)"
-                          >
-                            Re-generate
-                          </button>
-                        )}
+                        {/* No re-generate button by design: the Receipt Issued
+                            cell (column O) is the gate. To re-issue, the admin
+                            clears it in Excel and refreshes. */}
                       </>
                     )}
                   </div>
@@ -557,46 +546,6 @@ export default function ReceiptsPage() {
         </div>
       )}
 
-      {/* ── Duplicate confirmation modal ── */}
-      {confirmDup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="font-bold text-gray-800 mb-2">⚠ Receipt already exists</h3>
-            {(() => {
-              // Dates may come from the spreadsheet (another admin issued it) or
-              // from this machine's ledger — receiptState covers both.
-              const rs = receiptState(confirmDup.student, confirmDup.entry);
-              return (
-                <p className="text-sm text-gray-600 mb-1">
-                  A receipt for <strong>{confirmDup.student.studentName}</strong> was already generated
-                  {rs?.issued ? <> on <strong>{rs.issued}</strong></> : null}{" "}
-                  (<span className="font-mono text-xs">{rs?.receiptNo}</span>
-                  {rs?.sent && <> — and marked <strong>sent on {rs.sent}</strong></>}).
-                </p>
-              );
-            })()}
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to create it again? It keeps the <strong>same receipt number</strong> and replaces the
-              old file, so no duplicate receipt will exist.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setConfirmDup(null)}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { const d = confirmDup; setConfirmDup(null); generate(d.student, true); }}
-                className="px-4 py-2 text-sm rounded-lg text-white font-semibold"
-                style={{ backgroundColor: "#AB33DA" }}
-              >
-                Yes, re-create it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

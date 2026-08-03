@@ -67,7 +67,7 @@ Both the Invoices and Receipts pages have a **Term sheet dropdown** — it lists
 
 Receipt numbers are automatic and fixed — `R-AY26T3-013` = term AY 26 T3, serial 13. Re-generating the same receipt keeps the same number and overwrites the same file, so you can never get two conflicting receipts.
 
-**Status lives in the spreadsheet, and syncs both ways.** The app reads receipt status from columns **O** and **R** — so it's identical on every computer, and **editing those cells in Excel changes what the app shows** (on the next ⟳ Refresh). Clear **R** to un-send; clear **both O and R** to fully cancel a receipt. Clearing them doesn't delete the PDF already in the folder — it just frees the row to be issued again. (See the cancellation note in §8.)
+**Status lives in the spreadsheet, and the marks are the gate.** The app reads invoice status from column **L** and receipt status from columns **O** and **R** — identical on every computer — and **a marked row is never output again**: no re-export of an invoice while L is filled, no re-generation of a receipt while O is filled. The app offers no override; re-issuing is always an Excel decision. Clear **L** to allow an invoice again; clear **R** to un-send; clear **both O and R** to fully cancel a receipt. Then save and **⟳ Refresh**. Clearing marks doesn't delete PDFs already in the folder. (See the cancellation note in §8.)
 
 ### Status
 
@@ -126,7 +126,7 @@ A–H are formulas from Master. Fill in I–R for the term:
 | I | Lessons | `12` | **Blank = 12.** A number bills that many (`6` for a mid-term joiner). **`0` = not enrolled this term** (skipped from the run) |
 | J | Material Fee ($) | `-80` or `90` | One figure, ± . Minus discounts, plain number adds. Prints as one "Material Fee" line. Blank/`0` = none |
 | K | Material Fee Notes | `2 lessons missed` | **Internal only — never printed.** Your reminder of why J is what it is |
-| L | Invoice Issued | *app writes* | `INV-AY26T4-S015 · 01/08/26` — stamped automatically the moment the app exports that child's invoice to the shared folder (the stamp carries their Student ID, so the app can spot a mark that's drifted onto the wrong row). **Two-way**, like Receipt Issued: clear the cell in Excel, save, and **⟳ Refresh** on the invoice review screen shows it as not-issued again |
+| L | Invoice Issued | *app writes* | `INV-AY26T4-S015 · 01/08/26` — stamped automatically the moment the app exports that child's invoice to the shared folder (the stamp carries their Student ID, so the app can spot a mark that's drifted onto the wrong row). **This mark is the gate: a marked row is never exported again** — the app offers no way around it. To re-issue, clear the cell in Excel, save, and **⟳ Refresh**; the row becomes exportable again |
 | M | Paid | `yes` / `PayNow` / `13/7/26` | Anything except empty/no = paid — see **Paid rule** |
 | N | Date of Receipt | `13/7/26` | **Prints on the receipt** ("received a payment … on 13/07/26") |
 | O | Receipt Issued | *app writes* | `R-AY26T3-015 · 14/07/26`; red (issued) → green (sent). Clear it to cancel — see §8 |

@@ -48,12 +48,22 @@ export async function POST(request: NextRequest) {
   const written: string[] = [];
   const stamps: { studentId: string; invNo: string }[] = [];
   const failed: string[] = [];
+  const skippedIssued: string[] = [];
 
   for (const s of body.students) {
     // A child with no permanent ID can't be exported: the invoice number and
     // the Invoice Issued stamp would have nothing stable to hang on to.
     if (!s.studentId) {
       failed.push(`serial ${s.serialNo} (no Student ID — refresh the list with Excel closed)`);
+      continue;
+    }
+    // The sheet's Invoice Issued cell (column L) is the gate: a marked row is
+    // never exported again, no matter what the client sends. Re-issuing is an
+    // Excel decision — clear the cell, save, Refresh. (Server-side backstop
+    // for the same rule the page enforces.)
+    const issuedMark = (s.invoiceIssued ?? "").trim().toLowerCase();
+    if (issuedMark !== "" && !["no", "n", "false", "0"].includes(issuedMark)) {
+      skippedIssued.push(s.studentId);
       continue;
     }
     try {
@@ -82,5 +92,5 @@ export async function POST(request: NextRequest) {
     warning = wb.warning ?? null;
   }
 
-  return Response.json({ ok: failed.length === 0, written: written.length, failed, folder: dir, warning });
+  return Response.json({ ok: failed.length === 0, written: written.length, failed, skippedIssued, folder: dir, warning });
 }

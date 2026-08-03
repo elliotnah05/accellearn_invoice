@@ -230,17 +230,21 @@ export default function InvoicesPage() {
   }
 
   function approveAll() {
+    // An Invoice Issued mark (column L) is the gate: marked rows are never
+    // re-approved or re-exported. Re-issue = clear the cell in Excel + Refresh.
     setRows((prev) => prev.map((r) =>
-      isBilledThisTerm(r.student) && r.status !== "flagged" && !isBlocked(r.student) ? { ...r, status: "approved" } : r
+      isBilledThisTerm(r.student) && r.status !== "flagged" && !isBlocked(r.student) && !isInvoiceIssued(r.student)
+        ? { ...r, status: "approved" } : r
     ));
   }
 
   async function exportToFolder() {
     // Approved + soft-blocked can only exist via the explicit "Approve anyway"
     // override, so export honours it; hard-blocked rows can never be approved
-    // and are excluded outright.
+    // and are excluded outright. Issued rows (column L marked) are excluded
+    // unconditionally — the sheet's mark is the gate, cleared only in Excel.
     const approved = rows
-      .filter((r) => r.status === "approved" && isBilledThisTerm(r.student) && !isHardBlocked(r.student))
+      .filter((r) => r.status === "approved" && isBilledThisTerm(r.student) && !isHardBlocked(r.student) && !isInvoiceIssued(r.student))
       .map((r) => r.student);
     if (approved.length === 0) return;
     setExporting(true);
@@ -364,6 +368,7 @@ export default function InvoicesPage() {
           {/* Hint */}
           <p className="text-xs text-gray-400">
             Preview each invoice before approving. Flag any that need correction — flagged invoices will not be sent.
+            A row with an Invoice Issued mark (column L) is never exported again — to re-issue one, clear that cell in Excel, save, and Refresh.
           </p>
 
           {/* Review table */}
@@ -455,7 +460,14 @@ export default function InvoicesPage() {
 
                         {/* Action buttons */}
                         <td className="px-4 py-3 text-center">
-                          {isBlocked(row.student) ? (
+                          {isInvoiceIssued(row.student) && !isBlocked(row.student) ? (
+                            <span
+                              className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500 font-medium"
+                              title="This invoice is issued (column L has a mark). To re-issue it, clear the Invoice Issued cell in Excel, save, and press Refresh."
+                            >
+                              Issued — re-issue via Excel
+                            </span>
+                          ) : isBlocked(row.student) ? (
                             <div className="flex items-center justify-center gap-1.5">
                               <span
                                 className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
