@@ -128,16 +128,21 @@ export default function ReceiptsPage() {
     return new Set([...count.entries()].filter(([, n]) => n > 1).map(([k]) => k));
   })();
 
-  function blockReason(s: Student): { label: string; hint: string } | null {
+  /** `override: true` = the admin may consciously push this row through
+   *  per-row; it is only ever excluded from the BULK action. Duplicate IDs get
+   *  no override: two rows with one ID would produce receipts carrying the
+   *  SAME receipt number, corrupt paperwork no matter the intent. */
+  function blockReason(s: Student): { label: string; hint: string; override: boolean } | null {
     if (s.studentId && dupIds.has(s.studentId)) {
-      return { label: "⚠ Duplicate ID", hint: `Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh` };
+      return { label: "⚠ Duplicate ID", override: false, hint: `Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh` };
     }
     if (dupIdents.has(identityKey(s.studentName, s.parentName))) {
-      return { label: "⚠ Same name & parent", hint: "Two rows have this exact name and parent. If it's one child typed twice, delete the extra Master row; if they're different children, make one name distinguishable. Then Refresh" };
+      return { label: "⚠ Same name & parent", override: true, hint: "Two rows have this exact name and parent. If it's one child typed twice, delete the extra Master row; if they really are different children, use Generate anyway — or make one name distinguishable and Refresh" };
     }
     return null;
   }
 
+  /** Blocked for the bulk action (Generate All Ready always skips these). */
   function isBlocked(s: Student): boolean {
     return blockReason(s) !== null;
   }
@@ -429,13 +434,32 @@ export default function ReceiptsPage() {
                     >
                       {previewing.has(sKey(s)) ? "Loading…" : "Preview"}
                     </button>
-                    {isBlocked(s) ? (
+                    {isBlocked(s) && !blockReason(s)!.override ? (
                       <span
                         className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
                         title={blockReason(s)!.hint}
                       >
                         {blockReason(s)!.label}
                       </span>
+                    ) : isBlocked(s) && st === "ready" ? (
+                      <>
+                        <span
+                          className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
+                          title={blockReason(s)!.hint}
+                        >
+                          {blockReason(s)!.label}
+                        </span>
+                        {/* The conscious per-row escape hatch. Generate All
+                            Ready still always skips this row. */}
+                        <button
+                          onClick={() => generate(s)}
+                          disabled={isBusy || bulkRunning || folderOk === false}
+                          className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-600 font-medium hover:bg-red-50 transition-colors disabled:opacity-40"
+                          title="Generate THIS receipt despite the duplicate. Use only if you're sure these are two different children."
+                        >
+                          {isBusy ? "Generating…" : "Generate anyway"}
+                        </button>
+                      </>
                     ) : (
                       <>
                         {st === "ready" && (
