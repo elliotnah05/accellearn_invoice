@@ -111,3 +111,15 @@ export function normalizeStudentId(id: string): string {
 export function isAppStudentId(id: string): boolean {
   return /^S\d{3,}$/.test(normalizeStudentId(id));
 }
+
+/** The key used whenever a student has to be matched WITHOUT a Student ID
+ *  (a child typed moments ago has none yet): student name PLUS parent name.
+ *  Name alone is not identity — two different children genuinely can share a
+ *  full name, and matching on it made the second child invisible: never given
+ *  a term row, therefore never given an ID, therefore never billed, with every
+ *  name-based safety check satisfied by their namesake. Two children sharing a
+ *  name AND a parent is a different-children case the sheet cannot express —
+ *  the app warns and locks their documents instead of guessing. */
+export function identityKey(name: string, parent: string): string {
+  return `${(name ?? "").trim().toLowerCase()}|${(parent ?? "").trim().toLowerCase()}`;
+}

@@ -228,11 +228,13 @@ async function refresh(config, file, sheet) {
   const steps = [];
   const writes = [];
   let result = parseWorkbook(fs.readFileSync(file), sheet);
-  if (result.leftoverRows.length > 0 || result.frozenTab) {
+  // Tidy runs on every refresh (matching the route): a husk can live only on a
+  // tab the admin never views, where no per-tab trigger would ever fire.
+  {
     const c = await tidyTermTabs(config);
     steps.push(`tidy ${JSON.stringify(c)}`);
     if (c.removed + c.cleared + c.repaired > 0) { writes.push("tidy"); result = parseWorkbook(fs.readFileSync(file), sheet); }
-    else if (c.warning) result.errors.push(c.warning);
+    else if (c.warning && (result.leftoverRows.length > 0 || result.frozenTab)) result.errors.push(c.warning);
   }
   if (result.rosterGaps.length > 0) {
     const s = await syncTermRosters(config);

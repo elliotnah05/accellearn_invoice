@@ -3,7 +3,7 @@ import { existsSync } from "fs";
 import type { TemplateConfig } from "@/app/api/config/route";
 import { isMasterSheet } from "@/lib/parse-students";
 import { readLedger } from "@/lib/billing-store";
-import { normalizeStudentId } from "@/types/student";
+import { normalizeStudentId, identityKey } from "@/types/student";
 
 // Writes receipt status back into the master spreadsheet so Excel and the app
 // always tell the same story. Best-effort: if the file is open in Excel
@@ -11,6 +11,7 @@ import { normalizeStudentId } from "@/types/student";
 // the receipt generation.
 
 const COL_STUDENT_NAME   = 2;  // B
+const COL_PARENT_NAME    = 3;  // C — part of the no-ID identity key (see identityKey)
 const COL_IDENTITY_LAST  = 8;  // H — last column mirrored from Master
 const COL_TERM_FIRST     = 9;  // I — first per-term column (Lessons)
 const COL_INVOICE_ISSUED = 12; // L
@@ -480,23 +481,42 @@ export async function syncTermRosters(config: TemplateConfig): Promise<RosterSyn
       // Who this tab already shows, by value. A tab can hold rows that aren't
       // linked at all (someone pasted values over part of it), and those rows
       // still bill the student — inserting a mirror beside one would invoice
-      // them twice. Matching on the visible name/ID is what rules that out.
+      // them twice. Matching on the visible identity is what rules that out.
+      // The key is name PLUS parent, not name alone: a new child who happens to
+      // share a name with an existing student is a different child and must
+      // still get their row — name-only matching made them permanently
+      // invisible (no row → never scanned for an ID → no ID → every name-based
+      // check satisfied by the namesake).
       const onTab = new Set<string>();
       for (let r = 2; r <= ws.rowCount; r++) {
-        const name = cellText(ws.getRow(r).getCell(COL_STUDENT_NAME)).toLowerCase();
-        const id = normalizeStudentId(cellText(ws.getRow(r).getCell(COL_STUDENT_ID)));
-        if (name) onTab.add(name);
+        const row = ws.getRow(r);
+        const name = cellText(row.getCell(COL_STUDENT_NAME));
+        const id = normalizeStudentId(cellText(row.getCell(COL_STUDENT_ID)));
+        if (name) onTab.add(identityKey(name, cellText(row.getCell(COL_PARENT_NAME))));
         if (id) onTab.add(id);
       }
       const missing = dataRows.filter((r) => {
         if (mirrored.has(r)) return false;
-        const name = cellText(master.getRow(r).getCell(COL_STUDENT_NAME)).toLowerCase();
+        const name = cellText(master.getRow(r).getCell(COL_STUDENT_NAME));
+        const key = identityKey(name, cellText(master.getRow(r).getCell(COL_PARENT_NAME)));
         const id = normalizeStudentId(cellText(master.getRow(r).getCell(MASTER_COL_ID)));
-        return !(name && onTab.has(name)) && !(id && onTab.has(id));
+        return !(name && onTab.has(key)) && !(id && onTab.has(id));
       });
       if (missing.length === 0) continue;
 
       for (const m of missing) {
+        // A batch can contain its own duplicates: two new rows typed with the
+        // same name and parent, refreshed once. The onTab set was built from
+        // the tab as it WAS before this pass, so it cannot see them — track
+        // what this pass inserts and skip the indistinguishable repeat. The
+        // parser warns on the duplicate and the pages lock its documents; the
+        // admin decides which row is real.
+        const mName = cellText(master.getRow(m).getCell(COL_STUDENT_NAME));
+        if (mName) {
+          const mKey = identityKey(mName, cellText(master.getRow(m).getCell(COL_PARENT_NAME)));
+          if (onTab.has(mKey)) continue;
+          onTab.add(mKey);
+        }
         // Slot the new row where it belongs: straight after the row mirroring
         // the nearest student ABOVE them on Master, so the tab keeps Master's
         // order (which is the admin's level grouping).

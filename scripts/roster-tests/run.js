@@ -137,6 +137,146 @@ async function main() {
     }
   }
 
+  // ── Two children sharing a name ───────────────────────────────────────────
+  // Name alone is not identity. Matching on it made a new child who shared a
+  // name with an existing student permanently invisible: never given a term
+  // row, therefore never scanned for a Student ID, with every name-based check
+  // satisfied by the namesake. The identity key for children without an ID is
+  // now name PLUS parent.
+  console.log("\nTwo children sharing a name");
+  {
+    const probe = H.freshCopy(src, "probe3.xlsx");
+    const { children } = await H.findSubjects(probe);
+    const namesake = children[2];
+
+    // Different parent → genuinely a different child → must be billed.
+    {
+      const file = H.freshCopy(src, "twin-diff-parent.xlsx");
+      const config = H.makeConfig(file);
+      const base = await H.refresh(config, file);
+      await H.simulateInsert(file, children[children.length - 1].row + 1, {
+        name: namesake.name, parent: "A Different Parent", school: "Other Sch",
+        level: "P6", subject: "Chemistry", hrs: 2, rate: 60,
+      });
+      const after = await H.refresh(config, file);
+      const twins = after.result.students.filter((s) => s.studentName === namesake.name);
+      const ids = twins.map((s) => s.studentId);
+      const moved = whoMoved(base.result, after.result);
+      check("a new child sharing an existing student's name still gets billed",
+        twins.length === 2 && ids.every((id) => /^S\d+$/.test(id)) && ids[0] !== ids[1] &&
+        twins.every((s) => s.totalFee > 0) && moved.length === 0,
+        `students named "${namesake.name}": ${twins.length}, IDs: ${ids.join("/") || "none"}, moved=${moved.length ? moved[0] : "none"}`);
+    }
+
+    // Same parent too → nothing on the sheet can tell them apart → the app
+    // must say so instead of silently guessing either way.
+    {
+      const file = H.freshCopy(src, "twin-same-parent.xlsx");
+      const config = H.makeConfig(file);
+      await H.refresh(config, file);
+      const { children: kids } = await H.findSubjects(file);
+      const dup = kids[2];
+      const wb = new (H.excel().Workbook)();
+      await wb.xlsx.readFile(file);
+      const m = wb.worksheets.find((w) => H.isMaster(w.name));
+      const parent = H.cellText(m.getRow(dup.row).getCell(3));
+      await wb.xlsx.writeFile(file);
+      await H.simulateInsert(file, kids[kids.length - 1].row + 1, {
+        name: dup.name, parent, school: "S", level: "P6", subject: "Physics", hrs: 2, rate: 60,
+      });
+      const after = await H.refresh(config, file);
+      const warned = after.result.errors.some((e) => e.includes("SAME name and parent") && e.includes(dup.name));
+      check("identical name AND parent produces a warning, not a silent guess", warned,
+        `errors: ${after.result.errors.slice(0, 2).join(" | ") || "none"}`);
+    }
+
+    // Several new rows typed before ONE refresh, two of them identical. The
+    // dedupe checks the tab as it WAS, so it cannot see same-batch duplicates —
+    // the insert pass has to dedupe against itself as well. (Found live: two
+    // identical test rows and one different-parent row, one refresh → all
+    // three billed.)
+    {
+      const file = H.freshCopy(src, "twin-batch.xlsx");
+      const config = H.makeConfig(file);
+      await H.refresh(config, file);
+      const { children: kids } = await H.findSubjects(file);
+      const bottom = kids[kids.length - 1].row + 1;
+      await H.simulateInsert(file, bottom, { name: "Batch Twin", parent: "Same Parent", school: "S", level: "P4", subject: "Math", hrs: 2, rate: 40 });
+      await H.simulateInsert(file, bottom + 1, { name: "Batch Twin", parent: "Same Parent", school: "S", level: "P4", subject: "Science", hrs: 2, rate: 50 });
+      await H.simulateInsert(file, bottom + 2, { name: "Batch Twin", parent: "Different Parent", school: "S", level: "P4", subject: "English", hrs: 2, rate: 45 });
+      const after = await H.refresh(config, file);
+      const twins = after.result.students.filter((s) => s.studentName === "Batch Twin");
+      const warned = after.result.errors.some((e) => e.includes("SAME name and parent"));
+      check("two identical rows typed in one batch don't both get billed",
+        twins.length === 2 && warned,
+        `billed rows named Batch Twin: ${twins.length} (want 2: one of the identical pair + the different-parent child), warned=${warned}`);
+    }
+
+    // The reason name matching exists at all: a row pasted over as plain values
+    // (no link) still bills its student — they must NOT get a second row.
+    {
+      const file = H.freshCopy(src, "pasted-values.xlsx");
+      const config = H.makeConfig(file);
+      const base = await H.refresh(config, file);
+      const { single } = await H.findSubjects(file);
+      const wb = new (H.excel().Workbook)();
+      await wb.xlsx.readFile(file);
+      for (const ws of wb.worksheets) {
+        if (H.isMaster(ws.name)) continue;
+        for (let r = 2; r <= ws.rowCount; r++) {
+          if (H.cellText(ws.getRow(r).getCell(19)).trim().toUpperCase() !== single.id.toUpperCase()) continue;
+          for (let c = 1; c <= 19; c++) {
+            const cell = ws.getRow(r).getCell(c);
+            const v = cell.value;
+            if (v && typeof v === "object" && "formula" in v) {
+              const res = v.result;
+              cell.value = res === null || res === undefined ? null : res;
+            }
+          }
+        }
+      }
+      await wb.xlsx.writeFile(file);
+      const after = await H.refresh(config, file);
+      const rows = after.result.students.filter((s) => s.studentName === single.name);
+      check("a row pasted as plain values never gets a duplicate inserted beside it",
+        rows.length === 1 && after.result.students.length === base.result.students.length,
+        `rows for ${single.name}: ${rows.length}, roster ${base.result.students.length} → ${after.result.students.length}`);
+    }
+  }
+
+  // ── Husks the viewed tab cannot see ───────────────────────────────────────
+  // A husk on a tab with no typed term data reads as an all-blank row through
+  // the flattened parse, so it used to be discarded before the leftover check —
+  // and if the active tab's own husks were tidied by hand, nothing ever
+  // triggered the cleaner again. The orphan check now runs before the blank
+  // skip, and the tidy pass runs on every refresh.
+  console.log("\nHusks the viewed tab cannot see");
+  {
+    const file = H.freshCopy(src, "invisible-husks.xlsx");
+    const config = H.makeConfig(file);
+    const { single } = await H.findSubjects(file);
+    const activeSheet = (await H.refresh(config, file)).result.sheetName;
+    await H.simulateDelete(file, single.row, 1);
+    // Hand-tidy ONLY the active tab, the way an admin who sees #REF! would —
+    // leaving just the data-less husks on the other tabs.
+    const wb = new (H.excel().Workbook)();
+    await wb.xlsx.readFile(file);
+    const ws = wb.worksheets.find((w) => w.name === activeSheet);
+    for (let r = ws.rowCount; r >= 2; r--) {
+      const v = ws.getRow(r).getCell(2).value;
+      const isErr = v !== null && typeof v === "object" &&
+        (("error" in v) || ("result" in v && v.result && typeof v.result === "object" && "error" in v.result));
+      if (isErr) ws.spliceRows(r, 1);
+    }
+    await wb.xlsx.writeFile(file);
+    const preResidue = await H.residue(file);
+    await H.refresh(config, file);
+    const postResidue = await H.residue(file);
+    check("husks left only on unviewed tabs are still cleaned on refresh",
+      preResidue.length > 0 && postResidue.length === 0,
+      `before refresh: ${preResidue.length} husk(s), after: ${postResidue.length} (${postResidue[0] || "clean"})`);
+  }
+
   // ── A frozen term is a closed record ──────────────────────────────────────
   console.log("\nFrozen terms");
   {

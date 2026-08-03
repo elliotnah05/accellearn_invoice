@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Fragment } from "react";
 import Link from "next/link";
-import { subjectsText, totalLessons, type ParseResult, type Student } from "@/types/student";
+import { subjectsText, totalLessons, identityKey, type ParseResult, type Student } from "@/types/student";
 import { isDesktop, openFolder } from "@/lib/desktop";
 
 type ApprovalStatus = "pending" | "approved" | "flagged";
@@ -191,19 +191,60 @@ export default function InvoicesPage() {
     return new Set([...count.entries()].filter(([, n]) => n > 1).map(([id]) => id));
   })();
 
+  /** Children indistinguishable on the sheet: the same name AND parent. Almost
+   *  always one child typed twice — exporting both would bill the family
+   *  double, so approval locks until the sheet says which row is real. */
+  const dupIdents = (() => {
+    const count = new Map<string, number>();
+    for (const r of rows) {
+      const k = identityKey(r.student.studentName, r.student.parentName);
+      count.set(k, (count.get(k) ?? 0) + 1);
+    }
+    return new Set([...count.entries()].filter(([, n]) => n > 1).map(([k]) => k));
+  })();
+
+  /** `override: true` = the admin may consciously push this row through
+   *  per-row; it is only ever excluded from the BULK actions. Duplicate IDs
+   *  get no override: two rows with one ID would print two invoices carrying
+   *  the SAME invoice number, which is corrupt paperwork no matter what the
+   *  admin intends. */
+  function blockReason(s: Student): { label: string; hint: string; override: boolean } | null {
+    if (s.studentId && dupIds.has(s.studentId)) {
+      return { label: "⚠ Duplicate ID", override: false, hint: `Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh` };
+    }
+    if (dupIdents.has(identityKey(s.studentName, s.parentName))) {
+      return { label: "⚠ Same name & parent", override: true, hint: "Two rows have this exact name and parent. If it's one child typed twice, delete the extra Master row; if they really are different children, use Approve anyway — or make one name distinguishable and Refresh" };
+    }
+    return null;
+  }
+
+  /** Blocked for bulk actions (Approve All never touches any blocked row). */
   function isBlocked(s: Student): boolean {
-    return !!s.studentId && dupIds.has(s.studentId);
+    return blockReason(s) !== null;
+  }
+
+  /** Blocked absolutely — no override exists, export must never include it. */
+  function isHardBlocked(s: Student): boolean {
+    const b = blockReason(s);
+    return b !== null && !b.override;
   }
 
   function approveAll() {
+    // An Invoice Issued mark (column L) is the gate: marked rows are never
+    // re-approved or re-exported. Re-issue = clear the cell in Excel + Refresh.
     setRows((prev) => prev.map((r) =>
-      isBilledThisTerm(r.student) && r.status !== "flagged" && !isBlocked(r.student) ? { ...r, status: "approved" } : r
+      isBilledThisTerm(r.student) && r.status !== "flagged" && !isBlocked(r.student) && !isInvoiceIssued(r.student)
+        ? { ...r, status: "approved" } : r
     ));
   }
 
   async function exportToFolder() {
+    // Approved + soft-blocked can only exist via the explicit "Approve anyway"
+    // override, so export honours it; hard-blocked rows can never be approved
+    // and are excluded outright. Issued rows (column L marked) are excluded
+    // unconditionally — the sheet's mark is the gate, cleared only in Excel.
     const approved = rows
-      .filter((r) => r.status === "approved" && isBilledThisTerm(r.student) && !isBlocked(r.student))
+      .filter((r) => r.status === "approved" && isBilledThisTerm(r.student) && !isHardBlocked(r.student) && !isInvoiceIssued(r.student))
       .map((r) => r.student);
     if (approved.length === 0) return;
     setExporting(true);
@@ -327,6 +368,7 @@ export default function InvoicesPage() {
           {/* Hint */}
           <p className="text-xs text-gray-400">
             Preview each invoice before approving. Flag any that need correction — flagged invoices will not be sent.
+            A row with an Invoice Issued mark (column L) is never exported again — to re-issue one, clear that cell in Excel, save, and Refresh.
           </p>
 
           {/* Review table */}
@@ -418,13 +460,41 @@ export default function InvoicesPage() {
 
                         {/* Action buttons */}
                         <td className="px-4 py-3 text-center">
-                          {isBlocked(row.student) ? (
+                          {isInvoiceIssued(row.student) && !isBlocked(row.student) ? (
                             <span
-                              className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
-                              title={`Student ID ${row.student.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh`}
+                              className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500 font-medium"
+                              title="This invoice is issued (column L has a mark). To re-issue it, clear the Invoice Issued cell in Excel, save, and press Refresh."
                             >
-                              ⚠ Duplicate ID
+                              Issued — re-issue via Excel
                             </span>
+                          ) : isBlocked(row.student) ? (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span
+                                className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
+                                title={blockReason(row.student)!.hint}
+                              >
+                                {blockReason(row.student)!.label}
+                              </span>
+                              {/* The conscious per-row escape hatch. Bulk Approve
+                                  All still always skips this row. */}
+                              {blockReason(row.student)!.override && row.status !== "approved" && (
+                                <button
+                                  onClick={() => setStatus(i, "approved")}
+                                  className="px-2.5 py-1 text-xs rounded-lg border border-red-300 text-red-600 font-medium hover:bg-red-50 transition-colors"
+                                  title="Approve THIS row despite the duplicate — it will print on the next Export. Use only if you're sure these are two different children."
+                                >
+                                  Approve anyway
+                                </button>
+                              )}
+                              {blockReason(row.student)!.override && row.status === "approved" && (
+                                <button
+                                  onClick={() => setStatus(i, "pending")}
+                                  className="px-2.5 py-1 text-xs rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors"
+                                >
+                                  Reset
+                                </button>
+                              )}
+                            </div>
                           ) : (
                           <div className="flex items-center justify-center gap-1.5">
                             {row.status !== "approved" && (

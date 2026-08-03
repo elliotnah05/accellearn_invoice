@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { subjectsText, type Student, type ParseResult } from "@/types/student";
+import { subjectsText, identityKey, type Student, type ParseResult } from "@/types/student";
 import type { LedgerEntry } from "@/lib/billing-store";
 import { receiptState } from "@/lib/receipt-status";
 import { isDesktop, openFolder } from "@/lib/desktop";
@@ -41,7 +41,6 @@ export default function ReceiptsPage() {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [banner, setBanner]       = useState<{ kind: "ok" | "warn"; text: string } | null>(null);
   const [sheetIssues, setSheetIssues] = useState<string[]>([]);
-  const [confirmDup, setConfirmDup] = useState<{ student: Student; entry: LedgerEntry } | null>(null);
   const [preview, setPreview]     = useState<{ url: string; name: string } | null>(null);
   const [previewing, setPreviewing] = useState<Set<string>>(new Set());
   const previewCache = useRef<Record<string, string>>({});
@@ -116,8 +115,35 @@ export default function ReceiptsPage() {
     return new Set([...count.entries()].filter(([, n]) => n > 1).map(([id]) => id));
   })();
 
+  /** Children indistinguishable on the sheet: the same name AND parent. Almost
+   *  always one child typed twice — generating for both would double up, so
+   *  their action buttons lock until the sheet says which row is real. */
+  const dupIdents = (() => {
+    const count = new Map<string, number>();
+    for (const s of students) {
+      const k = identityKey(s.studentName, s.parentName);
+      count.set(k, (count.get(k) ?? 0) + 1);
+    }
+    return new Set([...count.entries()].filter(([, n]) => n > 1).map(([k]) => k));
+  })();
+
+  /** `override: true` = the admin may consciously push this row through
+   *  per-row; it is only ever excluded from the BULK action. Duplicate IDs get
+   *  no override: two rows with one ID would produce receipts carrying the
+   *  SAME receipt number, corrupt paperwork no matter the intent. */
+  function blockReason(s: Student): { label: string; hint: string; override: boolean } | null {
+    if (s.studentId && dupIds.has(s.studentId)) {
+      return { label: "⚠ Duplicate ID", override: false, hint: `Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh` };
+    }
+    if (dupIdents.has(identityKey(s.studentName, s.parentName))) {
+      return { label: "⚠ Same name & parent", override: true, hint: "Two rows have this exact name and parent. If it's one child typed twice, delete the extra Master row; if they really are different children, use Generate anyway — or make one name distinguishable and Refresh" };
+    }
+    return null;
+  }
+
+  /** Blocked for the bulk action (Generate All Ready always skips these). */
   function isBlocked(s: Student): boolean {
-    return !!s.studentId && dupIds.has(s.studentId);
+    return blockReason(s) !== null;
   }
 
   function setRowBusy(key: string, on: boolean) {
@@ -128,19 +154,15 @@ export default function ReceiptsPage() {
     });
   }
 
-  async function generate(student: Student, force = false): Promise<boolean> {
+  async function generate(student: Student): Promise<boolean> {
     setRowBusy(sKey(student), true);
     try {
       const res = await fetch("/api/receipts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "generate", student, term: sheetName, force }),
+        body: JSON.stringify({ action: "generate", student, term: sheetName }),
       });
       const body = await res.json();
-      if (res.status === 409 && body.duplicate) {
-        setConfirmDup({ student, entry: body.entry });
-        return false;
-      }
       if (!res.ok) {
         setBanner({ kind: "warn", text: body.error ?? "Receipt generation failed" });
         return false;
@@ -231,7 +253,7 @@ export default function ReceiptsPage() {
     let done = 0;
     for (const s of students) {
       if (rowStatus(s) !== "ready") continue;   // never touches already-generated rows
-      if (isBlocked(s)) continue;               // duplicate Student ID — fix the sheet first
+      if (isBlocked(s)) continue;               // duplicate ID or indistinguishable twin — fix the sheet first
       if (await generate(s)) done++;
     }
     setBulkRunning(false);
@@ -356,7 +378,8 @@ export default function ReceiptsPage() {
         </div>
 
         <p className="text-xs text-gray-400">
-          Mark payments in the Excel (Paid + Date of Receipt), re-import, then generate here. Receipt numbers are fixed per
+          Mark payments in the Excel (Paid + Date of Receipt), re-import, then generate here. A row with a Receipt Issued
+          mark (column O) is never generated again — to re-issue one, clear that cell in Excel, save, and Refresh. Receipt numbers are fixed per
           student — re-generating never creates a second receipt, and the app warns before any re-issue.
         </p>
 
@@ -407,13 +430,32 @@ export default function ReceiptsPage() {
                     >
                       {previewing.has(sKey(s)) ? "Loading…" : "Preview"}
                     </button>
-                    {isBlocked(s) ? (
+                    {isBlocked(s) && !blockReason(s)!.override ? (
                       <span
                         className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
-                        title={`Student ID ${s.studentId} is used by more than one child — fix the Student ID column on Master, then Refresh`}
+                        title={blockReason(s)!.hint}
                       >
-                        ⚠ Duplicate ID
+                        {blockReason(s)!.label}
                       </span>
+                    ) : isBlocked(s) && st === "ready" ? (
+                      <>
+                        <span
+                          className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-600 font-semibold"
+                          title={blockReason(s)!.hint}
+                        >
+                          {blockReason(s)!.label}
+                        </span>
+                        {/* The conscious per-row escape hatch. Generate All
+                            Ready still always skips this row. */}
+                        <button
+                          onClick={() => generate(s)}
+                          disabled={isBusy || bulkRunning || folderOk === false}
+                          className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-600 font-medium hover:bg-red-50 transition-colors disabled:opacity-40"
+                          title="Generate THIS receipt despite the duplicate. Use only if you're sure these are two different children."
+                        >
+                          {isBusy ? "Generating…" : "Generate anyway"}
+                        </button>
+                      </>
                     ) : (
                       <>
                         {st === "ready" && (
@@ -435,16 +477,9 @@ export default function ReceiptsPage() {
                             Mark as Sent
                           </button>
                         )}
-                        {(st === "generated" || st === "sent") && (
-                          <button
-                            onClick={() => generate(s)}
-                            disabled={isBusy || bulkRunning}
-                            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40"
-                            title="Re-create this receipt (asks for confirmation)"
-                          >
-                            Re-generate
-                          </button>
-                        )}
+                        {/* No re-generate button by design: the Receipt Issued
+                            cell (column O) is the gate. To re-issue, the admin
+                            clears it in Excel and refreshes. */}
                       </>
                     )}
                   </div>
@@ -511,46 +546,6 @@ export default function ReceiptsPage() {
         </div>
       )}
 
-      {/* ── Duplicate confirmation modal ── */}
-      {confirmDup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-            <h3 className="font-bold text-gray-800 mb-2">⚠ Receipt already exists</h3>
-            {(() => {
-              // Dates may come from the spreadsheet (another admin issued it) or
-              // from this machine's ledger — receiptState covers both.
-              const rs = receiptState(confirmDup.student, confirmDup.entry);
-              return (
-                <p className="text-sm text-gray-600 mb-1">
-                  A receipt for <strong>{confirmDup.student.studentName}</strong> was already generated
-                  {rs?.issued ? <> on <strong>{rs.issued}</strong></> : null}{" "}
-                  (<span className="font-mono text-xs">{rs?.receiptNo}</span>
-                  {rs?.sent && <> — and marked <strong>sent on {rs.sent}</strong></>}).
-                </p>
-              );
-            })()}
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to create it again? It keeps the <strong>same receipt number</strong> and replaces the
-              old file, so no duplicate receipt will exist.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setConfirmDup(null)}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { const d = confirmDup; setConfirmDup(null); generate(d.student, true); }}
-                className="px-4 py-2 text-sm rounded-lg text-white font-semibold"
-                style={{ backgroundColor: "#AB33DA" }}
-              >
-                Yes, re-create it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

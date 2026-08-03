@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import {
-  normalizeStudentId, isAppStudentId, recalcStudent,
+  normalizeStudentId, isAppStudentId, identityKey, recalcStudent,
   type ParseResult, type RosterGap, type Student, type SubjectLine,
 } from "@/types/student";
 
@@ -104,6 +104,7 @@ function stampInfo(cellText: string): { slug: string; studentId: string } | null
 function sheetSlug(name: string): string {
   return name.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "TERM";
 }
+
 
 /**
  * Sheet rows (1-based) whose identity cells hold an Excel error — the husk a
@@ -268,16 +269,29 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
   // Row 0 = headers, data starts at row 1
   for (let i = 1; i < raw.length; i++) {
     const row = raw[i];
-    if (!row || row.every((c) => c === "" || c === null || c === undefined)) continue;
-
-    const studentName = cellVal(row, COL.studentName);
 
     // ── Leftover row from a student deleted on Master. Skipped entirely: it is
     // billed to nobody and, crucially, is NOT offered to the child above as an
     // extra subject. `current` is deliberately left untouched so that deleting
     // one subject of a multi-subject child doesn't detach their remaining
-    // subject rows. ──
-    if (orphanRows.has(i + 1) || isErrorText(studentName)) {
+    // subject rows.
+    //
+    // Checked BEFORE the blank-row skip below, and against the RAW cells: on a
+    // tab with no typed term data yet (a term prepared in advance), a husk row
+    // is #REF! in the identity columns and nothing anywhere else — and
+    // sheet_to_json flattens error cells to "", so through the flattened read
+    // the whole row looks blank. Skipping blanks first would discard exactly
+    // those husks, leaving the tidy pass with no trigger and the #REF! rows in
+    // the sheet forever. ──
+    if (orphanRows.has(i + 1)) {
+      leftoverRows.push(i + 1);
+      continue;
+    }
+
+    if (!row || row.every((c) => c === "" || c === null || c === undefined)) continue;
+
+    const studentName = cellVal(row, COL.studentName);
+    if (isErrorText(studentName)) {
       leftoverRows.push(i + 1);
       continue;
     }
@@ -422,7 +436,7 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
     // blankrows:true keeps mMaster[i] on sheet row i+1, so reported row numbers
     // are the ones the admin sees.
     const mRaw = XLSX.utils.sheet_to_json<Row>(mastersheet, { header: 1, defval: "", blankrows: true });
-    const masterChildren: { row: number; name: string; id: string; subjectRows: number[] }[] = [];
+    const masterChildren: { row: number; name: string; parent: string; id: string; subjectRows: number[] }[] = [];
     for (let i = 1; i < mRaw.length; i++) {
       const mRow = mRaw[i];
       if (!mRow) continue;
@@ -431,6 +445,7 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
         masterChildren.push({
           row: i + 1,
           name,
+          parent: cellVal(mRow, COL.parentName),
           id: normalizeStudentId(cellVal(mRow, 8)), // Master column I
           subjectRows: [i + 1],
         });
@@ -443,14 +458,35 @@ export function parseWorkbook(buffer: Buffer, requestedSheet?: string): ParseRes
       if (last && isSubjectRow) last.subjectRows.push(i + 1);
     }
 
+    // Two children typed with the same name AND the same parent cannot be told
+    // apart by anything on the sheet. Warn instead of guessing — nine times out
+    // of ten it's the same child typed twice (the extra-subject rule is a blank
+    // name, not a repeated one), and if they really are two children the admin
+    // must make one of the names distinguishable.
+    const identCount = new Map<string, number>();
+    for (const child of masterChildren) {
+      const k = identityKey(child.name, child.parent);
+      identCount.set(k, (identCount.get(k) ?? 0) + 1);
+    }
+    for (const [k, n] of identCount) {
+      if (n < 2) continue;
+      const name = masterChildren.find((c) => identityKey(c.name, c.parent) === k)!.name;
+      errors.push(
+        `${n} students on Master are typed with the SAME name and parent ("${name}"). The app cannot tell them apart. ` +
+        `If this is one child's extra subject, leave the Student Name blank on the extra row instead of repeating it. ` +
+        `If they really are different children, make one name distinguishable (e.g. add the school).`
+      );
+    }
+
     // Matched on the mirrored VALUES, not on the link formulas: a formula whose
     // result is blank isn't stored in the file at all, so half the links are
-    // invisible from this side. Student ID first (permanent), name second (a
-    // child added just now has no ID until the app assigns one).
+    // invisible from this side. Student ID first (permanent), then name+parent
+    // (a child added just now has no ID until the app assigns one — and name
+    // alone is not identity, see identityKey).
     const byId = new Map(students.filter((s) => s.studentId).map((s) => [s.studentId, s]));
-    const byName = new Map(students.map((s) => [s.studentName.trim().toLowerCase(), s]));
+    const byIdent = new Map(students.map((s) => [identityKey(s.studentName, s.parentName), s]));
     for (const child of masterChildren) {
-      const onTerm = (child.id && byId.get(child.id)) || byName.get(child.name.trim().toLowerCase());
+      const onTerm = (child.id && byId.get(child.id)) || byIdent.get(identityKey(child.name, child.parent));
       if (!onTerm) {
         rosterGaps.push({ masterRow: child.row, name: child.name });
       } else if (onTerm.subjects.length < child.subjectRows.length) {

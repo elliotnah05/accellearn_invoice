@@ -8,7 +8,7 @@ import {
   readLedger, writeLedger, ledgerKey, receiptNo, termSlug,
   ensureOutputDir, safeFileName, outputFolderExists,
 } from "@/lib/billing-store";
-import { parseIssuedCell, parseSentCell } from "@/lib/receipt-status";
+import { parseIssuedCell } from "@/lib/receipt-status";
 import { writebackReceiptIssued, writebackReceiptSent } from "@/lib/sheet-writeback";
 import type { Student } from "@/types/student";
 import type { TemplateConfig } from "@/app/api/config/route";
@@ -44,7 +44,6 @@ interface GenerateBody {
   action: "generate";
   student: Student;
   term: string;
-  force?: boolean;   // explicit re-issue past the duplicate warning
 }
 interface MarkSentBody {
   action: "markSent";
@@ -161,30 +160,21 @@ export async function POST(request: NextRequest) {
     const key = ledgerKey(body.term, s.studentId);
     const existing = ledger[key];
 
-    // Duplicate guard. Checks the spreadsheet (column O) as well as the local
-    // ledger, so the warning still fires on a machine that has never issued
-    // this receipt itself — the shared Excel is what both admins have in common.
+    // The sheet's Receipt Issued cell (column O) is the gate: any mark there
+    // means this receipt exists and the app must not produce another one. Re-
+    // issuing is an EXCEL decision — the admin clears the cell, saves, and
+    // refreshes. The app never offers a way around the mark.
     const fromSheet = parseIssuedCell(s.receiptIssued);
-    if ((existing || fromSheet) && !body.force) {
+    if (fromSheet) {
       return Response.json(
-        {
-          duplicate: true,
-          // No local record, but the sheet says it was issued. Hand back an
-          // entry-shaped object; the client fills the dates in from the sheet.
-          entry: existing ?? {
-            studentId: s.studentId,
-            term: body.term,
-            receiptNo: fromSheet?.receiptNo || receiptNo(body.term, s.studentId),
-            amount: s.totalFee,
-            issuedAt: "",
-            reissuedAt: [],
-            sentAt: parseSentCell(s.receiptSent) ? "" : null,
-            file: "",
-          },
-        },
-        { status: 409 }
+        { error: `Receipt ${fromSheet.receiptNo || "for this student"} is already issued. To re-issue it, clear the Receipt Issued cell (column O) in Excel, save, and press Refresh.` },
+        { status: 400 }
       );
     }
+    // Sheet silent but a local ledger entry exists: either the admin cleared
+    // the mark (a deliberate re-issue) or the write-back never landed. Either
+    // way the receipt number is deterministic, so proceeding re-uses the same
+    // number and overwrites the same file — never a second receipt.
 
     try {
       const rNo = receiptNo(body.term, s.studentId);
