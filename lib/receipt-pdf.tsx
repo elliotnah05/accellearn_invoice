@@ -120,7 +120,11 @@ export function ReceiptPDF({ student: s, logoBase64, config, receiptNo, term, en
         <View style={S.infoSection}>
           <View style={S.infoDateRow}>
             <Text style={S.infoDateLabel}>Date:</Text>
-            <Text style={S.infoDateValue}>{todayDMY()}</Text>
+            {/* The date the payment was RECEIVED (sheet's Date of Receipt), not
+                the day the PDF was generated — a receipt re-issued weeks later
+                must still show the real payment date. Falls back to today only
+                when the sheet has no date. */}
+            <Text style={S.infoDateValue}>{paymentDate || todayDMY()}</Text>
           </View>
           <View style={S.infoRow}>
             <Text style={S.infoLabel}>Name of Child and Level:</Text>
@@ -137,7 +141,8 @@ export function ReceiptPDF({ student: s, logoBase64, config, receiptNo, term, en
           <Text>
             {"This is to acknowledge that we have received a payment of "}
             <Text style={S.bold}>{fmtSGD(s.totalFee)}</Text>
-            {paymentDate ? <Text>{" on "}<Text style={S.bold}>{paymentDate}</Text></Text> : null}
+            {/* No date here by design: the payment date lives in the Date:
+                field above, and the generation date appears nowhere. */}
             {" for the Term "}
             <Text style={S.bold}>{term}</Text>
             {" for "}
