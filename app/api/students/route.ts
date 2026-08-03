@@ -71,15 +71,19 @@ export async function GET(request: Request) {
     // tab, so the sheet returns to a clean state on its own. Best-effort: if
     // Excel has the file open the rows are simply skipped this time (the parser
     // already ignores them) and cleared on a later refresh.
-    // Leftovers are counted on the tab being viewed — except on a frozen past
-    // term, which by design shows none of them. Viewing one must not stop the
-    // other tabs being tidied, so there the pass runs unconditionally (it reads
-    // the workbook and writes only if it finds something).
-    if (result.leftoverRows.length > 0 || result.frozenTab) {
+    //
+    // Runs on EVERY refresh, not just when the viewed tab reports leftovers:
+    // a husk can live only on a tab the admin never opens (a future term with
+    // no typed data), where nothing would ever trip a per-tab trigger. On a
+    // clean workbook the pass reads, finds nothing, writes nothing and warns
+    // about nothing — the cost is one extra read of a small file.
+    {
       const cleaned = await tidyTermTabs(config);
       if (cleaned.removed + cleaned.cleared + cleaned.repaired > 0) {
         result = parseWorkbook(readFileSync(file), requestedSheet); // re-read the tidied sheet
-      } else if (cleaned.warning) {
+      } else if (cleaned.warning && (result.leftoverRows.length > 0 || result.frozenTab)) {
+        // Surface the "close Excel" message only when there is visibly
+        // something to clean — a clean workbook that failed to open is noise.
         result = { ...result, errors: [...result.errors, cleaned.warning] };
       }
     }
